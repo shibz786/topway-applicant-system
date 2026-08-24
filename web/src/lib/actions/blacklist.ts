@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { requireSession, type SessionUser } from "@/lib/auth/session";
 import { ForbiddenError } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorize";
 import { DISPUTE_TYPE_LABELS } from "@/lib/business/tracking";
 import { runAction, type ActionResult } from "./result";
 import type { DisputeType, WorkerCategory } from "@prisma/client";
@@ -47,6 +48,8 @@ export type BlacklistEntry = {
   fullName: string;
   nationality: string;
   category: WorkerCategory;
+  passportNumber: string;
+  idNumber: string | null;
   disputeCount: number;
   hasUnresolvedDispute: boolean;
   mostRecentAt: Date;
@@ -63,6 +66,8 @@ async function listBlacklistInternal(): Promise<BlacklistEntry[]> {
           fullName: true,
           nationality: true,
           category: true,
+          passportNumber: true,
+          idNumber: true,
           placements: {
             select: {
               startDate: true,
@@ -90,6 +95,8 @@ async function listBlacklistInternal(): Promise<BlacklistEntry[]> {
       fullName: c.fullName,
       nationality: c.nationality,
       category: c.category,
+      passportNumber: c.passportNumber,
+      idNumber: c.idNumber,
       disputeCount: 0,
       hasUnresolvedDispute: false,
       mostRecentAt: d.createdAt,
@@ -121,5 +128,82 @@ export async function listBlacklist(): Promise<ActionResult<BlacklistEntry[]>> {
     const user = await requireSession();
     assertCanViewBlacklist(user);
     return listBlacklistInternal();
+  });
+}
+
+export type BlacklistMatch = {
+  candidateId: string;
+  fullName: string;
+  matchedOn: "passport" | "idNumber";
+  disputeCount: number;
+  hasUnresolvedDispute: boolean;
+  mostRecentAgentName: string | null;
+};
+
+// Surfaced on the Profile Builder's personal-details step (per the user's
+// request: "when a new application is made... it should appear that this
+// candidate is blacklisted by xyz agent") so whoever is onboarding a
+// candidate sees this before finishing the form, not buried on a separate
+// portal they'd have to think to check. Matches on passport number OR ID
+// number — a candidate can resurface under a renewed passport, so passport
+// alone isn't enough to catch a repeat. A soft warning, not a hard block:
+// re-onboarding a previously-disputed candidate can be a legitimate,
+// informed decision, so this only informs, never prevents saving.
+export async function checkBlacklistMatch(input: {
+  passportNumber?: string;
+  idNumber?: string;
+  excludeCandidateId?: string;
+}): Promise<ActionResult<BlacklistMatch[]>> {
+  return runAction(async () => {
+    const user = await requireSession();
+    requirePermission(user, "applications");
+
+    const passportNumber = input.passportNumber?.trim();
+    const idNumber = input.idNumber?.trim();
+    const or: Record<string, unknown>[] = [];
+    if (passportNumber) or.push({ passportNumber: { equals: passportNumber, mode: "insensitive" } });
+    if (idNumber) or.push({ idNumber: { equals: idNumber, mode: "insensitive" } });
+    if (or.length === 0) return [];
+
+    const candidates = await db.candidate.findMany({
+      where: {
+        OR: or,
+        ...(input.excludeCandidateId ? { id: { not: input.excludeCandidateId } } : {}),
+      },
+      select: {
+        id: true,
+        fullName: true,
+        passportNumber: true,
+        idNumber: true,
+        disputes: {
+          orderBy: { createdAt: "desc" },
+          select: { createdAt: true, resolvedAt: true },
+        },
+        placements: {
+          select: { startDate: true, endDate: true, agent: { select: { companyName: true } } },
+        },
+      },
+    });
+
+    return candidates
+      .filter((c) => c.disputes.length > 0)
+      .map((c) => {
+        const mostRecent = c.disputes[0];
+        const placement = c.placements.find(
+          (p) =>
+            p.startDate.getTime() <= mostRecent.createdAt.getTime() &&
+            (!p.endDate || p.endDate.getTime() >= mostRecent.createdAt.getTime()),
+        );
+        return {
+          candidateId: c.id,
+          fullName: c.fullName,
+          matchedOn: (passportNumber && c.passportNumber.toLowerCase() === passportNumber.toLowerCase()
+            ? "passport"
+            : "idNumber") as "passport" | "idNumber",
+          disputeCount: c.disputes.length,
+          hasUnresolvedDispute: c.disputes.some((d) => !d.resolvedAt),
+          mostRecentAgentName: placement?.agent.companyName ?? null,
+        };
+      });
   });
 }

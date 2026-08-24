@@ -13,6 +13,7 @@ export const personalDetailsSchema = z.object({
   dateOfBirth: z.string().min(1, "Date of birth is required"), // yyyy-mm-dd
   passportNumber: z.string().trim().min(1, "Passport number is required").max(50),
   passportExpiry: z.string().min(1, "Passport expiry is required"), // yyyy-mm-dd
+  idNumber: z.string().trim().max(50).optional(),
   phone: z.string().trim().max(50).optional(),
   address: z.string().trim().max(500).optional(),
   religion: z.string().trim().max(100).optional(),

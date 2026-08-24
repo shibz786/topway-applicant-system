@@ -22,7 +22,17 @@ export function BlacklistTable() {
     },
   });
 
-  const filtered = (data ?? []).filter((e) => e.fullName.toLowerCase().includes(query.trim().toLowerCase()));
+  // Search by name, passport number, or NIC/ID number — a candidate might
+  // be looked up by whichever document is in hand at the time.
+  const filtered = (data ?? []).filter((e) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      e.fullName.toLowerCase().includes(q) ||
+      e.passportNumber.toLowerCase().includes(q) ||
+      (e.idNumber ?? "").toLowerCase().includes(q)
+    );
+  });
 
   if (isLoading) {
     return (
@@ -45,7 +55,7 @@ export function BlacklistTable() {
   return (
     <div className="space-y-3">
       <Input
-        placeholder="Search by name…"
+        placeholder="Search by name, passport, or NIC…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="max-w-xs"
@@ -98,12 +108,14 @@ function BlacklistCard({ entry }: { entry: BlacklistEntry }) {
   return (
     <Card className="gap-0 overflow-hidden p-0">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-4 py-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <p className="font-heading font-semibold">{entry.fullName}</p>
           <Badge variant="secondary" className="text-xs">
             {WORKER_CATEGORY_LABELS[entry.category]}
           </Badge>
           <span className="text-xs text-muted-foreground">{entry.nationality}</span>
+          <span className="font-mono text-[11px] text-muted-foreground">Passport: {entry.passportNumber}</span>
+          <span className="font-mono text-[11px] text-muted-foreground">ID no: {entry.idNumber || "-"}</span>
         </div>
         <Badge
           className={cn(

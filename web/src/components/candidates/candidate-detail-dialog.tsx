@@ -190,6 +190,7 @@ export function CandidateDetailDialog({
 
                 <TabsContent value="profile" className="space-y-2 text-sm">
                   <Field label="Passport No." value={candidate.passportNumber} />
+                  {candidate.idNumber && <Field label="ID No." value={candidate.idNumber} />}
                   <Field label="Passport Expiry" value={new Date(candidate.passportExpiry).toLocaleDateString()} />
                   <Field label="Date of Birth" value={new Date(candidate.dateOfBirth).toLocaleDateString()} />
                   {candidate.religion && <Field label="Religion" value={candidate.religion} />}

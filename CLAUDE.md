@@ -792,6 +792,59 @@ under Phase 0 below — build the new one.
   4-10s), not a bug, once the verification script waited for the skeleton to actually detach
   instead of a fixed timeout. Test license/contact values and the throwaway screenshot scripts
   were removed after confirming correctness.
+- **Candidate ID number, blacklist search, and new-application blacklist warning — done.** Three
+  follow-up asks in one message. Neither legacy data nor the original schema tracked a national
+  ID/NIC number for a candidate (only `passportNumber` existed) — added `Candidate.idNumber`
+  (nullable `String`, migration applied live, plus indexes on both `passportNumber` and `idNumber`
+  since they're now lookup keys, not just display fields), wired into the Profile Builder's
+  personal-details step, the candidate detail popup's Profile tab, and both places already showed
+  Passport No.
+  - **Blacklist card**: each listing's header now shows Passport No. and ID no. next to name/
+    category/nationality (per the user's explicit ask), and the search box
+    (`blacklist-table.tsx`) now matches name, passport number, or ID number, not name alone.
+  - **New-application blacklist warning**: the user's framing — "when an agent make a new
+    application... it should appear that this candidate is blacklisted by xyz agent" — maps to the
+    Profile Builder's personal-details step (the only "new application" creation flow in the app;
+    it's admin/staff-gated via the `applications` permission, matching how "agent" gets used
+    loosely here for "whoever is entering the application"). New `checkBlacklistMatch()`
+    (`lib/actions/blacklist.ts`) matches on passport OR ID number, not passport alone, since a
+    repeat candidate can resurface under a renewed passport; debounced 600ms on either field in
+    `profile-wizard.tsx`, purely informational — it warns, it never blocks saving, since
+    re-onboarding a previously-disputed candidate can be a legitimate, informed call by staff.
+    Shows the matched candidate's name, dispute count, resolved/unresolved status, and (reusing
+    the same active-placement-at-dispute-time attribution `listBlacklistInternal()` already uses)
+    which agent most recently handled them.
+  **Verified live**: screenshotted the Blacklist page confirming Passport/ID no. render for both
+  the populated and blank cases, confirmed the search box filters correctly by passport number
+  and separately by NIC/ID number, and confirmed the wizard warning fires with the exact match
+  (name, dispute count, unresolved flag, agent) *before* the form was ever submitted (checked the
+  DB directly to confirm no stray candidate record got created just from typing) — this needed a
+  much longer wait than the first attempt assumed, same dev-to-Singapore-Supabase latency lesson
+  as the entry above. Test data and the scratch verification script were removed afterward.
+- **SLBFE (slbfe.lk) integration — investigated, on hold pending a scope decision.** The user
+  asked to "connect the platform to slbfe.lk and connect any agents to their profile." Real
+  research before writing any code (not an assumption): SLBFE has no public API. Its agency search
+  (`applications.slbfe.lk/feb/la/la_main.asp?&LID=1`, a classic-ASP form POSTing to
+  `la_details.asp` with a `an` license-number field) **only covers Sri Lanka-based ("Local
+  Agency") recruitment agencies** — confirmed by actually submitting real license numbers and
+  reading the returned HTML (e.g. license 5 returns "THE CEYLON EMPLOYMENT COMPANY... Cancelled
+  Agency... Agency Validation Expired!", license 9999 returns "Sorry, Your request not found!!!").
+  The `Agent` model in this app represents the *foreign* destination-country counterpart agencies
+  (Saudi Arabia/Kuwait/Oman/Qatar — confirmed against real `data/agents.json` entries like "Al
+  Hamra Recruitment Agency, Saudi Arabia"), and a separate SLBFE content page confirmed directly
+  ("Licensed Foreign Employment Agencies in Sri Lanka") that SLBFE's public tooling has **no
+  search database at all for destination-country/receiving agencies** — only for the Sri
+  Lanka-based agencies (like Topway itself) that SLBFE actually licenses. Building a scraper
+  against `la_details.asp` keyed on each `Agent.licenseNo` would therefore return "not found" for
+  every single agent in the system by construction, not as a signal of anything real — flagged
+  this finding to the user rather than shipping something structurally guaranteed to mislead.
+  The user picked the "scrape/monitor SLBFE for status" option when asked, which authorizes
+  building a scraper in principle — but the domain-mismatch finding above means the *target* of
+  that scraper (per-Agent foreign-agency status) isn't something SLBFE's public tools can answer,
+  so the actual implementation is still blocked on the user confirming what entity should be
+  checked (most likely Topway's own SLBFE license/status as the Sri Lanka-based licensee, a
+  company-level check rather than a per-Agent one) before writing the scraper itself. **Not yet
+  built** — do not add Agent-level SLBFE fields/scraping until that's resolved.
 
 ## Tech stack (exact)
 

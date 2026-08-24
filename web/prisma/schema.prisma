@@ -137,6 +137,12 @@ model Candidate {
   dateOfBirth      DateTime
   passportNumber   String
   passportExpiry   DateTime
+  // National ID / NIC number — a second identity document alongside the
+  // passport, requested for the Blacklist portal so a candidate can be
+  // matched even if their passport was renewed/replaced since a prior
+  // dispute. Neither legacy data nor the original schema tracked this;
+  // nullable since no existing (migrated) candidate has one on file.
+  idNumber         String?
   phone            String?
   address          String?
   religion         String?
@@ -157,6 +163,8 @@ model Candidate {
   updatedAt        DateTime       @updatedAt
 
   @@index([category])
+  @@index([passportNumber])
+  @@index([idNumber])
   @@index([inDatabank])
 }
 

@@ -13,6 +13,7 @@ import {
   getCandidate,
   type CandidateDetail,
 } from "@/lib/actions/candidates";
+import { checkBlacklistMatch, type BlacklistMatch } from "@/lib/actions/blacklist";
 import {
   personalDetailsSchema,
   experienceSkillsSchema,
@@ -30,6 +31,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DocumentUpload } from "./document-upload";
+import { TriangleAlert } from "lucide-react";
 import type { WorkerCategory } from "@prisma/client";
 
 const STEPS = ["Personal Details", "Experience & Skills", "Documents", "Review"] as const;
@@ -114,6 +116,7 @@ function PersonalDetailsStep({
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<PersonalDetailsInput>({
     resolver: zodResolver(personalDetailsSchema),
@@ -123,6 +126,7 @@ function PersonalDetailsStep({
       dateOfBirth: "",
       passportNumber: "",
       passportExpiry: "",
+      idNumber: "",
       phone: "",
       address: "",
       religion: "",
@@ -137,12 +141,39 @@ function PersonalDetailsStep({
         dateOfBirth: new Date(existing.dateOfBirth).toISOString().slice(0, 10),
         passportNumber: existing.passportNumber,
         passportExpiry: new Date(existing.passportExpiry).toISOString().slice(0, 10),
+        idNumber: existing.idNumber ?? "",
         phone: existing.phone ?? "",
         address: existing.address ?? "",
         religion: existing.religion ?? "",
       });
     }
   }, [existing, reset]);
+
+  // Blacklist check: per the user's request, whoever is entering a new
+  // application should see immediately if this candidate (matched by
+  // passport or ID number, since a repeat candidate can resurface under a
+  // renewed passport) already has dispute history, and which agent handled
+  // it. Debounced on either field, not blocking — see checkBlacklistMatch()
+  // in lib/actions/blacklist.ts for why this only warns, never prevents
+  // saving.
+  const passportNumber = watch("passportNumber");
+  const idNumber = watch("idNumber");
+  const [blacklistMatches, setBlacklistMatches] = useState<BlacklistMatch[]>([]);
+  useEffect(() => {
+    const handle = setTimeout(async () => {
+      if (!passportNumber?.trim() && !idNumber?.trim()) {
+        setBlacklistMatches([]);
+        return;
+      }
+      const res = await checkBlacklistMatch({
+        passportNumber,
+        idNumber,
+        excludeCandidateId: candidateId,
+      });
+      setBlacklistMatches(res.ok ? res.data : []);
+    }, 600);
+    return () => clearTimeout(handle);
+  }, [passportNumber, idNumber, candidateId]);
 
   async function onSubmit(values: PersonalDetailsInput) {
     const res = candidateId
@@ -181,12 +212,43 @@ function PersonalDetailsStep({
           <Field label="Passport expiry" error={errors.passportExpiry?.message}>
             <Input type="date" {...register("passportExpiry")} />
           </Field>
+          <Field label="ID number">
+            <Input {...register("idNumber")} />
+          </Field>
           <Field label="Phone">
             <Input {...register("phone")} />
           </Field>
           <Field label="Address" className="sm:col-span-2">
             <Textarea rows={2} {...register("address")} />
           </Field>
+
+          {blacklistMatches.length > 0 && (
+            <div className="space-y-2 sm:col-span-2">
+              {blacklistMatches.map((m) => (
+                <div
+                  key={m.candidateId}
+                  className="flex items-start gap-2.5 rounded-md border border-critical/40 bg-critical/10 px-3 py-2.5 text-sm"
+                >
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-critical" />
+                  <p>
+                    <span className="font-medium text-critical">Blacklist match:</span>{" "}
+                    <strong>{m.fullName}</strong> already has {m.disputeCount}{" "}
+                    {m.disputeCount === 1 ? "dispute" : "disputes"} on record
+                    {m.hasUnresolvedDispute ? " (unresolved)" : ""}, matched by {m.matchedOn === "passport" ? "passport number" : "ID number"}.
+                    {m.mostRecentAgentName
+                      ? ` Most recently handled by ${m.mostRecentAgentName}.`
+                      : " No agent on record for the most recent dispute."}{" "}
+                    Check the{" "}
+                    <a href="/blacklist" target="_blank" rel="noreferrer" className="underline">
+                      Blacklist
+                    </a>{" "}
+                    before continuing.
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex justify-end sm:col-span-2">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Saving…" : "Save & Continue"}
