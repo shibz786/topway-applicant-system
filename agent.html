@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Topway – Agent Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    /* ── TOKENS ── */
+    :root {
+      --teal:#2B7A8C; --teal2:#1F5F6E; --teal-light:#EAF4F6;
+      --green:#27AE60; --amber:#E67E22; --red:#E74C3C;
+      --bg:#F0F4F6; --card:#FFFFFF; --border:#D1D9E0;
+      --text:#1A2B35; --muted:#8899A6; --radius:10px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+    /* Toast */
+    #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1A2B35;color:#fff;padding:10px 20px;border-radius:8px;font-size:.875rem;opacity:0;transition:all .3s;z-index:9999;white-space:nowrap;pointer-events:none;}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+    /* ── LOGIN ── */
+    #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1A2B35 0%,#2B7A8C 100%);padding:24px;}
+    .login-card{background:#fff;border-radius:16px;padding:48px 40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,.2);}
+    .login-logo{text-align:center;margin-bottom:32px;}
+    .login-logo img{height:52px;object-fit:contain;}
+    .login-logo-text{font-size:1.6rem;font-weight:800;color:var(--teal);letter-spacing:-.5px;}
+    .login-sub{font-size:.78rem;color:var(--muted);margin-top:3px;}
+    .login-title{font-size:1.15rem;font-weight:700;text-align:center;margin-bottom:6px;}
+    .login-hint{font-size:.8rem;color:var(--muted);text-align:center;margin-bottom:26px;}
+    .field{margin-bottom:14px;}
+    .field label{display:block;font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
+    .field input{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:.95rem;font-family:inherit;outline:none;transition:border-color .2s;}
+    .field input:focus{border-color:var(--teal);}
+    .btn-login{width:100%;padding:13px;background:var(--teal);color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s;margin-top:6px;}
+    .btn-login:hover{background:var(--teal2);}
+    .btn-login:disabled{opacity:.6;cursor:not-allowed;}
+    #login-error{color:var(--red);font-size:.82rem;text-align:center;margin-top:12px;display:none;}
+
+    /* ── DASHBOARD ── */
+    #dashboard{display:none;flex-direction:column;min-height:100vh;}
+
+    /* Header */
+    .dash-header{background:linear-gradient(135deg,#1A2B35 0%,#2B7A8C 100%);padding:0 24px;height:62px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.18);}
+    .dash-header-logos{display:flex;align-items:center;gap:10px;}
+    .dash-header-logos .twlogo{height:34px;object-fit:contain;filter:brightness(0) invert(1);}
+    .logo-divider{width:1px;height:26px;background:rgba(255,255,255,.25);display:none;}
+    .agent-logo-wrap{display:none;}
+    .agent-logo-wrap img{height:32px;object-fit:contain;background:rgba(255,255,255,.1);border-radius:5px;padding:3px 7px;}
+    .dash-header-info{flex:1;}
+    .dash-header-info h1{font-size:.95rem;font-weight:700;color:#fff;line-height:1.2;}
+    .dash-header-info p{font-size:.72rem;color:rgba(255,255,255,.6);}
+    .btn-ghost-hdr{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);padding:7px 14px;border-radius:7px;font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit;}
+    .btn-ghost-hdr:hover{background:rgba(255,255,255,.22);}
+
+    /* Body */
+    .dash-body{padding:24px;max-width:1400px;margin:0 auto;width:100%;flex:1;}
+
+    /* Stats */
+    .stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
+    @media(max-width:700px){.stats-row{grid-template-columns:repeat(3,1fr);}}
+    @media(max-width:440px){.stats-row{grid-template-columns:repeat(2,1fr);}}
+    .stat{background:var(--card);border-radius:var(--radius);padding:15px 14px;border-left:4px solid var(--teal);box-shadow:0 1px 4px rgba(0,0,0,.06);}
+    .stat.green{border-left-color:var(--green);}
+    .stat.amber{border-left-color:var(--amber);}
+    .stat.red  {border-left-color:var(--red);}
+    .stat.grey {border-left-color:var(--muted);}
+    .stat-val{font-size:1.8rem;font-weight:800;line-height:1;}
+    .stat-lbl{font-size:.68rem;color:var(--muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+
+    /* Toolbar */
+    .toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
+    .toolbar-left{display:flex;align-items:center;gap:8px;}
+    .search-wrap{position:relative;}
+    .search-wrap input{padding:8px 12px 8px 34px;border:1.5px solid var(--border);border-radius:7px;font-size:.85rem;font-family:inherit;outline:none;width:220px;transition:border-color .2s;}
+    .search-wrap input:focus{border-color:var(--teal);}
+    .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
+    .filter-sel{padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:.84rem;font-family:inherit;outline:none;background:#fff;cursor:pointer;transition:border-color .2s;}
+    .filter-sel:focus{border-color:var(--teal);}
+    .view-toggle{display:flex;background:#F0F4F6;border-radius:7px;padding:3px;gap:2px;}
+    .view-btn{padding:6px 12px;border:none;border-radius:5px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;background:transparent;color:var(--muted);transition:all .15s;display:flex;align-items:center;gap:5px;}
+    .view-btn.active{background:#fff;color:var(--teal);box-shadow:0 1px 3px rgba(0,0,0,.1);}
+
+    /* ── CARD VIEW ── */
+    .applicant-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+    .appl-card{background:var(--card);border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;transition:border-color .2s;display:flex;flex-direction:column;}
+    .appl-card:hover{border-color:var(--teal);}
+    .appl-photo{width:100%;height:180px;background:#EAF4F6;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+    .appl-photo img{width:100%;height:100%;object-fit:cover;}
+    .appl-photo-empty{font-size:3rem;color:var(--teal);opacity:.3;}
+    .appl-body{padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:7px;}
+    .appl-name{font-size:.92rem;font-weight:700;}
+    .appl-meta{font-size:.74rem;color:var(--muted);}
+    .appl-pipeline{display:flex;align-items:center;gap:3px;}
+    .pipe-dot{width:10px;height:10px;border-radius:50%;}
+    .pipe-dot.done{background:var(--green);}
+    .pipe-dot.pd{background:#D1D9E0;}
+    .pipe-count{font-size:.7rem;color:var(--muted);margin-left:5px;}
+    .appl-footer{padding:10px 16px;border-top:1px solid #F0F4F6;}
+    .btn-dl{width:100%;padding:8px;background:var(--teal);color:#fff;border:none;border-radius:7px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s;display:flex;align-items:center;justify-content:center;gap:6px;}
+    .btn-dl:hover:not(:disabled){background:var(--teal2);}
+    .btn-dl:disabled{opacity:.6;cursor:not-allowed;}
+
+    /* Badges */
+    .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.66rem;font-weight:700;white-space:nowrap;}
+    .badge.ready   {background:#D5F5E3;color:#1E8449;}
+    .badge.complete{background:#D6EAF8;color:#1A5276;}
+    .badge.progress{background:#FEF9E7;color:#9A7D0A;}
+    .badge.pending {background:#F2F3F4;color:#717D7E;}
+    .badge.sent{background:#E8DAEF;color:#6D3460;}
+    .badge.cancelled{background:#FADBD8;color:#922B21;}
+    .appl-card.sent{border-color:#BB8FCE;background:#FDF8FF;}
+
+    /* ── LIST VIEW ── */
+    #list-view{display:none;}
+    .tbl-wrap{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;}
+    .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    table.status-tbl{width:100%;border-collapse:collapse;}
+    table.status-tbl thead tr{background:#F7FAFB;}
+    table.status-tbl thead th{padding:8px 10px;text-align:left;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;}
+    table.status-tbl thead th.center{text-align:center;}
+    table.status-tbl tbody tr{border-bottom:1px solid #F0F4F6;transition:background .12s;}
+    table.status-tbl tbody tr:last-child{border-bottom:none;}
+    table.status-tbl tbody tr:hover{background:var(--teal-light);}
+    table.status-tbl tbody td{padding:8px 10px;font-size:.82rem;vertical-align:middle;}
+    table.status-tbl tbody td.wrap{min-width:100px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .td-name{font-weight:700;}
+    .td-muted{color:var(--muted);font-size:.76rem;}
+    /* Step cell */
+    .step-cell{text-align:center;}
+    .step-tick{display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;}
+    .step-tick.yes{background:#D5F5E3;color:#1E8449;}
+    .step-tick.no {background:#F2F3F4;color:#C0C8CE;}
+    /* Delay pill */
+    .delay-pill{display:inline-block;padding:2px 7px;border-radius:20px;font-size:.72rem;font-weight:700;}
+    .delay-pill.low   {background:#D5F5E3;color:#1E8449;}
+    .delay-pill.mid   {background:#FEF9E7;color:#9A7D0A;}
+    .delay-pill.high  {background:#FADBD8;color:#922B21;}
+    .delay-pill.none  {background:#F2F3F4;color:var(--muted);}
+    /* DL button in table */
+    .btn-dl-sm{padding:5px 12px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+    .btn-dl-sm:hover:not(:disabled){background:var(--teal2);}
+    .btn-dl-sm:disabled{opacity:.6;cursor:not-allowed;}
+
+    /* Empty */
+    .empty-state{text-align:center;padding:60px 20px;color:var(--muted);}
+    .empty-state svg{opacity:.25;margin-bottom:12px;}
+    .empty-state p{font-size:.9rem;}
+
+    /* ── AGENT TABS ── */
+    .agent-tabs{background:rgba(0,0,0,.15);display:flex;padding:0 24px;}
+    .agent-tab{padding:11px 18px;border:none;background:transparent;color:rgba(255,255,255,.55);font-size:.84rem;font-weight:600;cursor:pointer;font-family:inherit;border-bottom:2px solid transparent;transition:all .15s;}
+    .agent-tab.active{color:#fff;border-bottom-color:#fff;}
+    .agent-tab:hover:not(.active){color:rgba(255,255,255,.85);}
+
+    /* ── BROWSE VIEW ── */
+    #browse-section{display:none;}
+    .browse-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;}
+    .browse-card{background:var(--card);border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;transition:border-color .2s;}
+    .browse-card.requested{border-color:var(--amber);}
+    .browse-card.assigned{border-color:var(--green);}
+    .browse-photo{width:100%;height:130px;background:#EAF4F6;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+    .browse-photo img{width:100%;height:100%;object-fit:cover;}
+    .browse-body{padding:10px 12px;flex:1;}
+    .browse-name{font-size:.84rem;font-weight:700;}
+    .browse-meta{font-size:.71rem;color:var(--muted);margin-top:2px;}
+    .browse-footer{padding:8px 12px;border-top:1px solid #F0F4F6;}
+    .btn-request{width:100%;padding:7px;border:none;border-radius:6px;font-size:.77rem;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;}
+    .btn-request.available{background:var(--teal);color:#fff;}
+    .btn-request.available:hover{background:var(--teal2);}
+    .btn-request.requested{background:#FEF9E7;color:#9A7D0A;border:1.5px solid #E67E22;}
+    .btn-request.requested:hover{background:#FDEBD0;}
+    .btn-request.assigned{background:#EAF9EE;color:#1E8449;cursor:default;border:1.5px solid #27AE60;}
+
+    /* ── PROFILE VIEW MODAL ── */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;padding:20px;}
+    .modal-overlay.open{display:flex;}
+    .modal{background:#fff;border-radius:14px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.25);}
+    .modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;}
+    .modal-header h2{font-size:1rem;font-weight:700;}
+    .modal-close{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted);line-height:1;padding:2px 6px;}
+    .modal-body{padding:20px;}
+    .modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+    .pv-top{display:flex;gap:16px;margin-bottom:16px;}
+    .pv-headshot{width:80px;height:100px;border-radius:8px;overflow:hidden;background:var(--teal-light);display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;}
+    .pv-headshot img{width:100%;height:100%;object-fit:cover;}
+    .pv-info{flex:1;}
+    .pv-name{font-size:1.1rem;font-weight:800;margin-bottom:2px;}
+    .pv-role{font-size:.83rem;color:var(--muted);margin-bottom:8px;}
+    .pv-section{margin-bottom:14px;}
+    .pv-section-title{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+    .pv-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;}
+    .pv-row{display:flex;gap:6px;font-size:.81rem;padding:2px 0;}
+    .pv-lbl{color:var(--muted);font-weight:600;min-width:100px;flex-shrink:0;}
+    .pv-val{font-weight:500;}
+    .pv-steps{display:flex;gap:5px;flex-wrap:wrap;}
+    .pv-step{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:.71rem;font-weight:700;}
+    .pv-step.done{background:#D5F5E3;color:#1E8449;}
+    .pv-step.pd{background:#F2F3F4;color:#999;}
+    .appl-card{cursor:pointer;}
+    .appl-card:hover{border-color:var(--teal);}
+    .browse-card{cursor:default;}
+
+    /* ── PDF LAYOUT (hidden off-screen) ── */
+    #pdf-layout-container{position:fixed;left:-9999px;top:0;width:794px;}
+    #pdf-layout{
+      width:794px;min-height:1123px;height:auto;overflow:visible;
+      background:#fff;font-family:Inter,Arial,Helvetica,sans-serif;
+      color:#1a2830;display:none;flex-direction:column;padding:0;box-sizing:border-box;
+    }
+    :root{
+      --pdf-ink:#1a2830;--pdf-muted:#5d7d8c;--pdf-line:#dce8ec;
+      --pdf-line-strong:#b5cdd6;--pdf-soft:#f2f7f9;--pdf-accent:#284e5a;
+      --pdf-accent-2:#3a6e7e;--pdf-accent-light:#eaf4f7;--pdf-white:#ffffff;
+    }
+    .pdf-topbar{display:grid;grid-template-columns:1fr 1.5fr 1fr;align-items:center;padding:12px 18px;background:#fff;border-bottom:3px solid var(--pdf-accent);}
+    .pdf-logo-slot{display:flex;align-items:center;justify-content:flex-start;min-height:58px;}
+    .pdf-logo-slot.right{justify-content:flex-end;}
+    .pdf-logo{max-height:58px;max-width:200px;object-fit:contain;display:block;}
+    .pdf-logo-empty{font-size:8.5pt;color:var(--pdf-muted);font-style:italic;}
+    .pdf-agent-brand{display:flex;flex-direction:column;gap:3px;align-items:flex-start;}
+    .pdf-agent-name{font-size:8pt;font-weight:800;color:var(--pdf-teal);max-width:200px;text-transform:uppercase;line-height:1.2;}
+    .pdf-header-center{text-align:center;padding:0 14px;border-left:2px solid var(--pdf-line-strong);border-right:2px solid var(--pdf-line-strong);}
+    .pdf-header-title{font-size:14pt;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--pdf-accent);line-height:1;}
+    .pdf-header-sub{margin-top:3px;font-size:7.5pt;font-weight:600;color:var(--pdf-muted);letter-spacing:.08em;text-transform:uppercase;}
+    .pdf-body{padding:10px 14px 12px;display:flex;flex-direction:column;gap:7px;flex:1;}
+    .pdf-topgrid{display:grid;grid-template-columns:1.1fr 1fr 0.95fr;gap:7px;}
+    .pdf-box{border:1px solid var(--pdf-line-strong);border-radius:3px;overflow:hidden;background:#fff;}
+    .pdf-box-title{padding:5px 10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-size:7.5pt;background:var(--pdf-accent);color:#fff;}
+    .pdf-skill-table{width:100%;border-collapse:collapse;}
+    .pdf-skill-table td{border-top:1px solid var(--pdf-line);padding:5.5px 10px;font-size:9.5pt;}
+    .pdf-skill-table tr:first-child td{border-top:none;}
+    .pdf-skill-table tr:nth-child(even) td{background:var(--pdf-accent-light);}
+    .pdf-skill-label{font-weight:600;color:var(--pdf-ink);}
+    .pdf-skill-check{width:38px;text-align:center;}
+    .pdf-boxcb{display:inline-flex;width:15px;height:15px;border:1.5px solid var(--pdf-ink);border-radius:3px;align-items:center;justify-content:center;font-size:10pt;line-height:1;font-weight:900;}
+    .pdf-role-box{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 10px;gap:10px;background:linear-gradient(160deg,var(--pdf-accent) 0%,var(--pdf-accent-2) 100%);border:none;}
+    .pdf-role-title{font-size:16pt;font-weight:900;letter-spacing:.04em;color:#fff;text-transform:uppercase;text-align:center;line-height:1.15;}
+    .pdf-contract{font-size:8.5pt;font-weight:700;color:var(--pdf-accent);padding:4px 14px;border-radius:999px;background:#fff;letter-spacing:.04em;}
+    .pdf-headshot-box{padding:8px;}
+    .pdf-headshot{width:100%;height:155px;border:1px solid var(--pdf-line-strong);border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--pdf-soft);}
+    .pdf-headshot img{width:100%;height:100%;object-fit:cover;display:block;}
+    .pdf-placeholder{font-size:8.5pt;color:var(--pdf-muted);}
+    .pdf-maingrid{display:grid;grid-template-columns:2.05fr 0.9fr;gap:7px;}
+    .pdf-leftwide{border:1px solid var(--pdf-line-strong);border-radius:3px;overflow:hidden;background:#fff;}
+    .pdf-rightphoto{border:1px solid var(--pdf-line-strong);border-radius:3px;overflow:hidden;background:#fff;display:flex;flex-direction:column;}
+    .pdf-fullphoto{flex:1;background:var(--pdf-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:280px;}
+    .pdf-fullphoto img{width:100%;height:100%;object-fit:contain;background:#fff;display:block;}
+    .pdf-ref-under{padding:8px 10px;text-align:center;background:var(--pdf-accent);}
+    .pdf-ref-no{font-weight:600;color:rgba(255,255,255,.7);font-size:7.5pt;letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px;}
+    .pdf-ref-name{font-weight:900;color:#fff;letter-spacing:.02em;font-size:10.5pt;}
+    .pdf-info-table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    .pdf-info-table td,.pdf-info-table th{border-top:1px solid var(--pdf-line);padding:5.5px 10px;font-size:9.5pt;}
+    .pdf-info-table tr:first-child td{border-top:none;}
+    .pdf-info-table tr:nth-child(even) td{background:var(--pdf-accent-light);}
+    .pdf-lbl{width:40%;font-weight:700;color:var(--pdf-ink);}
+    .pdf-val{font-weight:500;color:var(--pdf-ink);}
+    .pdf-table-section{font-weight:800;color:#fff!important;background:var(--pdf-accent-2)!important;padding:5px 10px;font-size:7.5pt;letter-spacing:.08em;text-transform:uppercase;}
+    .pdf-emp-block{border:1px solid var(--pdf-line-strong);border-radius:3px;overflow:hidden;background:#fff;}
+    .pdf-emp-title{font-weight:800;padding:5px 10px;background:var(--pdf-accent);color:#fff;font-size:7.5pt;letter-spacing:.1em;text-transform:uppercase;}
+    .pdf-lang-table,.pdf-emp-table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    .pdf-lang-table th,.pdf-emp-table th{font-weight:700;padding:5px 10px;text-align:left;background:var(--pdf-soft);border-top:1px solid var(--pdf-line);font-size:7.5pt;letter-spacing:.07em;text-transform:uppercase;color:var(--pdf-accent);}
+    .pdf-lang-table td,.pdf-emp-table td{padding:5.5px 10px;border-top:1px solid var(--pdf-line);font-size:9.5pt;}
+    .pdf-emp-table tr:nth-child(even) td{background:var(--pdf-accent-light);}
+    .pdf-lang-table th:nth-child(2),.pdf-lang-table th:nth-child(3),
+    .pdf-lang-table td:nth-child(2),.pdf-lang-table td:nth-child(3){width:78px;text-align:center;}
+    .pdf-footer{background:var(--pdf-accent);color:#fff;text-align:center;padding:9px 14px;font-size:9.5pt;font-weight:600;letter-spacing:.01em;line-height:1.5;}
+    .pdf-val,.pdf-lbl,.pdf-ref-name,.pdf-ref-no,.pdf-footer,
+    .pdf-contract,.pdf-role-title,.pdf-skill-label,
+    .pdf-emp-table td,.pdf-lang-table td{overflow-wrap:anywhere;word-break:break-word;}
+  </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- ══ LOGIN ══════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="logo.png" alt="Topway" onerror="this.style.display='none';document.querySelector('.login-logo-text').style.display='block';" />
+      <div class="login-logo-text" style="display:none">TOPWAY</div>
+      <div class="login-sub">Global Recruitment Services</div>
+    </div>
+    <div class="login-title">Agent Portal</div>
+    <div class="login-hint">Sign in with your agency credentials</div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="Enter your username" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="Enter your password" autocomplete="current-password" />
+    </div>
+    <button class="btn-login" id="btn-login" onclick="doLogin()">Sign In</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ══════════════════════════════════════════════════ -->
+<div id="dashboard">
+  <header class="dash-header">
+    <div class="dash-header-logos">
+      <img class="twlogo" src="logo.png" alt="Topway" onerror="this.style.display='none'" />
+      <div class="logo-divider" id="hdr-divider"></div>
+      <div class="agent-logo-wrap" id="hdr-agent-logo">
+        <img id="hdr-agent-logo-img" src="" alt="Agency" />
+      </div>
+    </div>
+    <div class="dash-header-info">
+      <h1 id="hdr-company">Agency Dashboard</h1>
+      <p id="hdr-welcome">Welcome</p>
+    </div>
+    <button class="btn-ghost-hdr" onclick="doLogout()">Sign Out</button>
+  </header>
+  <div class="agent-tabs">
+    <button class="agent-tab active" id="atab-mine"   onclick="switchAgentTab('mine')">My Applicants</button>
+    <button class="agent-tab"        id="atab-browse" onclick="switchAgentTab('browse')">Browse &amp; Request</button>
+  </div>
+
+  <main class="dash-body">
+  <div id="mine-section">
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat"><div class="stat-val" id="st-total">0</div><div class="stat-lbl">Total</div></div>
+      <div class="stat green"><div class="stat-val" id="st-ready">0</div><div class="stat-lbl">Ready to Travel</div></div>
+      <div class="stat" style="border-left-color:#1A5276"><div class="stat-val" id="st-complete">0</div><div class="stat-lbl">Fully Processed</div></div>
+      <div class="stat amber"><div class="stat-val" id="st-prog">0</div><div class="stat-lbl">In Progress</div></div>
+      <div class="stat red"><div class="stat-val" id="st-cancel">0</div><div class="stat-lbl">Cancelled</div></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="search-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="search-input" placeholder="Search by name…" oninput="applyFilters()" />
+        </div>
+        <select class="filter-sel" id="filter-exp" onchange="applyFilters()">
+          <option value="">All Experience</option>
+          <option>HM 21-49 Exp</option>
+          <option>HM 50-55 Exp</option>
+          <option>HM 51-55 Exp</option>
+          <option>HM - First Time</option>
+          <option>Couple</option>
+          <option>Driver</option>
+          <option>House Boy</option>
+        </select>
+        <select class="filter-sel" id="filter-status" onchange="applyFilters()">
+          <option value="">All Status</option>
+          <option value="ready">Ready to Travel</option>
+          <option value="complete">Fully Processed</option>
+          <option value="progress">In Progress</option>
+          <option value="pending">Not Started</option>
+          <option value="sent">Sent</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn active" id="vbtn-cards" onclick="switchView('cards')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Cards
+        </button>
+        <button class="view-btn" id="vbtn-list" onclick="switchView('list')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          List
+        </button>
+      </div>
+    </div>
+
+    <!-- Card view -->
+    <div class="applicant-grid" id="appl-grid">
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <p>Loading applicants…</p>
+      </div>
+    </div>
+
+    <!-- List view -->
+    <div id="list-view">
+      <div class="tbl-wrap">
+        <div class="tbl-scroll">
+          <table class="status-tbl" id="status-table"></table>
+        </div>
+      </div>
+    </div>
+  </div><!-- /mine-section -->
+
+  <div id="browse-section">
+    <div class="browse-grid" id="browse-grid">
+      <div class="empty-state"><p>Loading profiles…</p></div>
+    </div>
+  </div>
+
+  </main>
+</div>
+
+<!-- ══ PROFILE VIEW MODAL ════════════════════════════════════════ -->
+<div class="modal-overlay" id="profile-view-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="pv-title">Profile</h2>
+      <button class="modal-close" onclick="closeProfileModal()">✕</button>
+    </div>
+    <div class="modal-body" id="pv-body"></div>
+    <div class="modal-footer">
+      <button class="btn-dl" style="width:auto;padding:8px 20px;" id="pv-dl-btn" onclick="">⬇ Download CV</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HIDDEN PDF LAYOUT ══════════════════════════════════════════ -->
+<div id="pdf-layout-container">
+  <div id="pdf-layout">
+    <div class="pdf-topbar">
+      <div class="pdf-logo-slot" id="pdf-left-logo-wrap"></div>
+      <div class="pdf-header-center">
+        <div class="pdf-header-title">CANDIDATE PROFILE</div>
+        <div class="pdf-header-sub">Applicant Information Sheet</div>
+      </div>
+      <div class="pdf-logo-slot right">
+        <img src="logo.png" alt="Agency" class="pdf-logo" onerror="this.style.display='none'" />
+      </div>
+    </div>
+    <div class="pdf-body">
+      <div class="pdf-topgrid">
+        <div class="pdf-box">
+          <div class="pdf-box-title">Skills</div>
+          <table class="pdf-skill-table" id="pdf-skills-table"></table>
+        </div>
+        <div class="pdf-box pdf-role-box">
+          <div class="pdf-role-title" id="pdf-role-title">HOUSEMAID</div>
+          <div class="pdf-contract" id="pdf-contract-bar">Contract: 2 Years</div>
+        </div>
+        <div class="pdf-box pdf-headshot-box">
+          <div class="pdf-headshot" id="pdf-headshot-wrap">
+            <span class="pdf-placeholder">Headshot</span>
+          </div>
+        </div>
+      </div>
+      <div class="pdf-maingrid">
+        <div class="pdf-leftwide">
+          <table class="pdf-info-table" id="pdf-personal-table"></table>
+          <table class="pdf-info-table" id="pdf-passport-table"></table>
+          <table class="pdf-info-table" id="pdf-edu-table"></table>
+        </div>
+        <div class="pdf-rightphoto">
+          <div class="pdf-fullphoto" id="pdf-fullphoto-wrap">
+            <span class="pdf-placeholder">Full Photo</span>
+          </div>
+          <div class="pdf-ref-under" id="pdf-ref-under"></div>
+        </div>
+      </div>
+      <div class="pdf-emp-block">
+        <div class="pdf-emp-title">Employment Record &amp; Language Skills</div>
+        <table class="pdf-lang-table">
+          <thead><tr><th>Language</th><th>Speaking</th><th>Writing</th></tr></thead>
+          <tbody id="pdf-lang-tbody"></tbody>
+        </table>
+        <table class="pdf-emp-table" id="pdf-emp-table-out">
+          <thead><tr><th>Position</th><th>Country</th><th>Period</th></tr></thead>
+          <tbody id="pdf-emp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="pdf-footer" id="pdf-footer"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════
+let currentAgent = null;
+let allApplicants = [];
+let currentView = 'cards';
+
+const STEPS = [
+  { key:'medical', label:'Medical'  },
+  { key:'enjaz',   label:'Enjaz'    },
+  { key:'bureau',  label:'Bureau'   },
+  { key:'wakalah', label:'Wakalah'  },
+  { key:'embassy', label:'Embassy'  },
+  { key:'payment', label:'Payment'  },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════════════════════════
+function showToast(msg, ms = 2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function dateLabel(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }); }
+  catch { return iso; }
+}
+
+function getStatus(tr) {
+  if (!tr) return 'pending';
+  if (tr.pipelineStatus === 'sent') return 'sent';
+  if ((tr.notes||'').toUpperCase().includes('CANCEL')) return 'cancelled';
+  const done = STEPS.filter(s => tr[s.key]).length;
+  if (done === 6 && tr.ticketDate) return 'ready';
+  if (done === 6) return 'complete';
+  if (done > 0)   return 'progress';
+  return 'pending';
+}
+const STATUS_LABEL = { ready:'Ready to Travel', complete:'Fully Processed', progress:'In Progress', pending:'Not Started', sent:'Sent', cancelled:'Cancelled' };
+
+// ═══════════════════════════════════════════════════════════════
+// Auth
+// ═══════════════════════════════════════════════════════════════
+async function doLogin() {
+  const btn = document.getElementById('btn-login');
+  const err = document.getElementById('login-error');
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  err.style.display = 'none';
+  if (!user || !pass) { err.textContent = 'Please enter username and password.'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const res  = await fetch('api/agent_auth.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'login', username:user, password:pass }) });
+    const data = await res.json().catch(() => ({ ok:false, error:'Server returned an invalid response' }));
+    if (!data.ok) throw new Error(data.error || 'Login failed');
+    currentAgent = data.agent;
+    localStorage.setItem('agentToken', data.agent.token);
+    initDashboard();
+  } catch(e) {
+    err.textContent = e.message || 'Could not sign in. Please check the credentials and try again.'; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+async function doLogout() {
+  const token = localStorage.getItem('agentToken') || '';
+  try { await fetch('api/agent_auth.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'logout', token }) }); } catch {}
+  localStorage.removeItem('agentToken');
+  currentAgent = null; allApplicants = [];
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('btn-login').disabled = false;
+  document.getElementById('btn-login').textContent = 'Sign In';
+}
+
+async function tryAutoLogin() {
+  const token = localStorage.getItem('agentToken');
+  if (!token) return;
+  try {
+    const res  = await fetch('api/agent_auth.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'verify', token }) });
+    const data = await res.json();
+    if (data.ok) { currentAgent = data.agent; initDashboard(); }
+    else localStorage.removeItem('agentToken');
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Dashboard init
+// ═══════════════════════════════════════════════════════════════
+async function initDashboard() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'flex';
+  document.getElementById('hdr-company').textContent = currentAgent.company || 'Agency Dashboard';
+  document.getElementById('hdr-welcome').textContent = `Welcome, ${currentAgent.name}`;
+  if (currentAgent.logo) {
+    document.getElementById('hdr-agent-logo-img').src = `uploads/${currentAgent.logo}`;
+    document.getElementById('hdr-agent-logo').style.display = 'block';
+    document.getElementById('hdr-divider').style.display = 'block';
+  }
+  configureBrowseAccess();
+  await loadApplicants();
+}
+
+function configureBrowseAccess() {
+  const allowBrowse = !!currentAgent?.settings?.allowAgentBrowse;
+  const browseTab = document.getElementById('atab-browse');
+  if (browseTab) browseTab.style.display = allowBrowse ? '' : 'none';
+  if (!allowBrowse) switchAgentTab('mine');
+}
+
+async function loadApplicants() {
+  const token = currentAgent?.token || localStorage.getItem('agentToken') || '';
+  try {
+    const res  = await fetch(`api/agent_applicants.php?token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    if (data.agent) currentAgent = { ...currentAgent, ...data.agent, token };
+    allApplicants = data.applicants || [];
+    updateStats();
+    applyFilters();
+  } catch(e) {
+    document.getElementById('appl-grid').innerHTML = `<div class="empty-state"><p>Failed to load applicants. Please refresh.</p></div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Stats
+// ═══════════════════════════════════════════════════════════════
+function updateStats() {
+  let ready=0, complete=0, prog=0, cancel=0;
+  allApplicants.forEach(ap => {
+    const s = getStatus(ap.tracking||{});
+    if (s === 'ready') ready++;
+    else if (s === 'complete') complete++;
+    else if (s === 'progress') prog++;
+    else if (s === 'cancelled') cancel++;
+  });
+  document.getElementById('st-total').textContent    = allApplicants.length;
+  document.getElementById('st-ready').textContent    = ready;
+  document.getElementById('st-complete').textContent = complete;
+  document.getElementById('st-prog').textContent     = prog;
+  document.getElementById('st-cancel').textContent   = cancel;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Filters + view switching
+// ═══════════════════════════════════════════════════════════════
+function switchView(v) {
+  currentView = v;
+  document.getElementById('vbtn-cards').classList.toggle('active', v === 'cards');
+  document.getElementById('vbtn-list').classList.toggle('active', v === 'list');
+  document.getElementById('appl-grid').style.display  = v === 'cards' ? '' : 'none';
+  document.getElementById('list-view').style.display  = v === 'list'  ? 'block' : 'none';
+  applyFilters();
+}
+
+function applyFilters() {
+  const q      = (document.getElementById('search-input')?.value || '').toLowerCase();
+  const exp    = document.getElementById('filter-exp')?.value    || '';
+  const status = document.getElementById('filter-status')?.value || '';
+
+  const list = allApplicants.filter(ap => {
+    const tr = ap.tracking || {};
+    if (q   && !(ap.name||'').toLowerCase().includes(q)) return false;
+    if (exp && (tr.experience||'') !== exp)               return false;
+    if (status && getStatus(tr) !== status)               return false;
+    return true;
+  });
+
+  if (currentView === 'cards') renderCards(list);
+  else renderListView(list);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Delay helper
+// ═══════════════════════════════════════════════════════════════
+function calcDelay(musaned, ticketDate) {
+  if (!musaned) return null;
+  const start = new Date(musaned);
+  const end   = ticketDate ? new Date(ticketDate) : new Date();
+  return Math.round((end - start) / 86400000);
+}
+
+function delayPill(days) {
+  if (days === null) return '<span class="delay-pill none">—</span>';
+  const cls = days < 60 ? 'low' : days < 120 ? 'mid' : 'high';
+  return `<span class="delay-pill ${cls}">${days}d</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Render applicant cards
+// ═══════════════════════════════════════════════════════════════
+function renderCards(list) {
+  list = list ?? allApplicants;
+  const grid = document.getElementById('appl-grid');
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <p>${allApplicants.length ? 'No applicants match the filters.' : 'No applicants assigned yet.'}</p></div>`;
+    return;
+  }
+  grid.innerHTML = list.map(ap => {
+    const tr     = ap.tracking || {};
+    const status = getStatus(tr);
+    const done   = STEPS.filter(s => tr[s.key]).length;
+    const dots   = STEPS.map(s => `<span class="pipe-dot ${tr[s.key] ? 'done' : 'pd'}" title="${s.label}"></span>`).join('');
+    const badgeClass = { ready:'ready', complete:'complete', progress:'progress', pending:'pending', sent:'sent', cancelled:'cancelled' }[status];
+    const photo = ap.headshot
+      ? `<img src="uploads/${escHtml(ap.headshot)}" alt="${escHtml(ap.name)}" onerror="this.parentElement.innerHTML='<span class=appl-photo-empty>👤</span>'" />`
+      : `<span class="appl-photo-empty">👤</span>`;
+    const expLine = tr.experience ? `<div class="appl-meta">${escHtml(tr.experience)}</div>` : '';
+
+    return `<div class="appl-card ${status === 'sent' ? 'sent' : ''}" onclick="openProfileModal('${ap.id}')">
+      <div class="appl-photo">${photo}</div>
+      <div class="appl-body">
+        <div class="appl-name">${escHtml(ap.name || '(Unnamed)')}</div>
+        <div class="appl-meta">${escHtml(ap.role || '')}</div>
+        ${expLine}
+        <div class="appl-pipeline">${dots}<span class="pipe-count">${done}/6</span></div>
+        <span class="badge ${badgeClass}">${STATUS_LABEL[status]}</span>
+      </div>
+      <div class="appl-footer" onclick="event.stopPropagation()">
+        <button class="btn-dl" id="dl-${ap.id}" onclick="downloadCV('${ap.id}')">
+          ⬇ Download CV
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Render list view (Excel-style table)
+// ═══════════════════════════════════════════════════════════════
+function renderListView(list) {
+  list = list ?? allApplicants;
+  const tbl = document.getElementById('status-table');
+  const STEP_KEYS = ['medical','enjaz','bureau','wakalah','embassy','payment'];
+
+  const thead = `<thead><tr>
+    <th>#</th>
+    <th>Name</th>
+    <th>Role</th>
+    <th>Age</th>
+    <th>Experience</th>
+    <th>Musaned</th>
+    <th>Delay</th>
+    <th class="center">Medical</th>
+    <th class="center">Enjaz</th>
+    <th class="center">Bureau</th>
+    <th class="center">Wakalah</th>
+    <th class="center">Embassy</th>
+    <th class="center">Payment</th>
+    <th>Ticket Date</th>
+    <th>Notes</th>
+    <th>Status</th>
+    <th></th>
+  </tr></thead>`;
+
+  if (!list.length) {
+    tbl.innerHTML = thead + `<tbody><tr><td colspan="17"><div class="empty-state" style="padding:40px 20px;">
+      <p>${allApplicants.length ? 'No applicants match the filters.' : 'No applicants assigned yet.'}</p>
+    </div></td></tr></tbody>`;
+    return;
+  }
+
+  const tick = v => `<span class="step-tick ${v ? 'yes' : 'no'}">${v ? '✓' : '✗'}</span>`;
+
+  const tbody = list.map((ap, idx) => {
+    const tr      = ap.tracking || {};
+    const status  = getStatus(tr);
+    const badgeCls = { ready:'ready', complete:'complete', progress:'progress', pending:'pending', sent:'sent', cancelled:'cancelled' }[status];
+    const delay   = calcDelay(tr.musaned, tr.ticketDate);
+
+    return `<tr onclick="openProfileModal('${ap.id}')" style="cursor:pointer">
+      <td class="td-muted">${idx + 1}</td>
+      <td class="td-name">${escHtml(ap.name || '—')}</td>
+      <td class="td-muted">${escHtml(ap.role || '—')}</td>
+      <td>${escHtml(ap.age || '—')}</td>
+      <td>${escHtml(tr.experience || '—')}</td>
+      <td>${tr.musaned ? dateLabel(tr.musaned) : '<span class="td-muted">—</span>'}</td>
+      <td>${delayPill(delay)}</td>
+      <td class="step-cell">${tick(tr.medical)}</td>
+      <td class="step-cell">${tick(tr.enjaz)}</td>
+      <td class="step-cell">${tick(tr.bureau)}</td>
+      <td class="step-cell">${tick(tr.wakalah)}</td>
+      <td class="step-cell">${tick(tr.embassy)}</td>
+      <td class="step-cell">${tick(tr.payment)}</td>
+      <td>${tr.ticketDate ? dateLabel(tr.ticketDate) : '<span class="td-muted">—</span>'}</td>
+      <td class="wrap td-muted">${escHtml(tr.notes || '')}</td>
+      <td><span class="badge ${badgeCls}">${STATUS_LABEL[status]}</span></td>
+      <td><button class="btn-dl-sm" id="dl-list-${ap.id}" onclick="event.stopPropagation();downloadCV('${ap.id}')">⬇ CV</button></td>
+    </tr>`;
+  }).join('');
+
+  tbl.innerHTML = thead + `<tbody>${tbody}</tbody>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PDF Download
+// ═══════════════════════════════════════════════════════════════
+async function downloadCV(profileId) {
+  const btn = document.getElementById('dl-' + profileId) || document.getElementById('dl-list-' + profileId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
+  try {
+    const token = currentAgent?.token || localStorage.getItem('agentToken') || '';
+    const res   = await fetch(`api/profile_for_agent.php?token=${encodeURIComponent(token)}&id=${encodeURIComponent(profileId)}`);
+    const data  = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Failed to load profile');
+
+    buildAgentPdfLayout(data.profile);
+    const layout = document.getElementById('pdf-layout');
+    layout.style.display = 'flex';
+
+    await waitForImages(layout);
+    await new Promise(r => setTimeout(r, 120));
+
+    const canvas = await html2canvas(layout, { scale: 3, useCORS: true, allowTaint: false, backgroundColor: '#fff', width: 794 });
+    layout.style.display = 'none';
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const imgData = canvas.toDataURL('image/jpeg', 0.97);
+    const pW = doc.internal.pageSize.getWidth();
+    const pH = doc.internal.pageSize.getHeight();
+    const iW = canvas.width; const iH = canvas.height;
+    const scale = Math.min(pW / (iW * 0.2645), pH / (iH * 0.2645));
+    const fW = iW * 0.2645 * scale; const fH = iH * 0.2645 * scale;
+    doc.addImage(imgData, 'JPEG', (pW-fW)/2, (pH-fH)/2, fW, fH);
+
+    // Append confirmed passport documents as extra pages
+    for (const docKey of ['doc-passport', 'doc-alteration']) {
+      const docFile = data.profile.images?.[docKey];
+      if (!docFile) continue;
+      try {
+        const docImg = await new Promise((res, rej) => {
+          const i = new Image(); i.crossOrigin = 'anonymous';
+          i.onload = () => res(i); i.onerror = rej;
+          i.src = `uploads/${docFile}?t=${Date.now()}`;
+        });
+        const c = document.createElement('canvas');
+        c.width = docImg.naturalWidth; c.height = docImg.naturalHeight;
+        c.getContext('2d').drawImage(docImg, 0, 0);
+        const dUrl = c.toDataURL('image/jpeg', 0.95);
+        doc.addPage();
+        const asp = c.width / c.height;
+        let dW = pW, dH = pH;
+        if (asp > pW / pH) dH = dW / asp; else dW = dH * asp;
+        doc.addImage(dUrl, 'JPEG', (pW - dW) / 2, (pH - dH) / 2, dW, dH);
+      } catch(docErr) { console.warn('Could not append', docKey, docErr); }
+    }
+
+    const safeName = (data.profile.fields?.['f-name'] || 'CV').replace(/[^a-z0-9 ]/gi,'').trim().replace(/\s+/g,'-');
+    doc.save(`${safeName}-CV.pdf`);
+    showToast('CV downloaded');
+  } catch(e) {
+    console.error(e);
+    showToast('Download failed: ' + e.message);
+    document.getElementById('pdf-layout').style.display = 'none';
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '⬇ Download CV'; }
+  }
+}
+
+function waitForImages(root) {
+  const imgs = [...root.querySelectorAll('img')];
+  return Promise.all(imgs.map(img =>
+    img.complete ? Promise.resolve() :
+    new Promise(r => { img.onload = r; img.onerror = r; })
+  ));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Build PDF layout from profile data
+// Uses agent's logo instead of stored foreignLogo
+// ═══════════════════════════════════════════════════════════════
+function buildAgentPdfLayout(profile) {
+  const f  = profile.fields   || {};
+  const im = profile.images   || {};
+
+  const agentLogo = currentAgent?.logo || '';
+  const agentCompany = currentAgent?.company || '';
+  document.getElementById('pdf-left-logo-wrap').innerHTML = `
+    <div class="pdf-agent-brand">
+      ${agentLogo
+        ? `<img src="uploads/${escHtml(agentLogo)}" class="pdf-logo" alt="Agency" />`
+        : (im.foreignLogo
+            ? `<img src="uploads/${escHtml(im.foreignLogo)}" class="pdf-logo" alt="Agency" />`
+            : '<div class="pdf-logo-empty">Agency Logo</div>')}
+      ${agentCompany ? `<div class="pdf-agent-name">${escHtml(agentCompany)}</div>` : ''}
+    </div>`;
+
+  // Role / contract
+  document.getElementById('pdf-role-title').textContent  = (f['f-role'] || 'HOUSEMAID').toUpperCase();
+  document.getElementById('pdf-contract-bar').textContent = 'Contract: ' + (f['f-contract'] || '2 Years');
+
+  // Photos
+  document.getElementById('pdf-fullphoto-wrap').innerHTML = im.fullphoto
+    ? `<img src="uploads/${escHtml(im.fullphoto)}" alt="Full Photo" />`
+    : '<span class="pdf-placeholder">Full Photo</span>';
+  document.getElementById('pdf-headshot-wrap').innerHTML = im.headshot
+    ? `<img src="uploads/${escHtml(im.headshot)}" alt="Headshot" />`
+    : '<span class="pdf-placeholder">Headshot</span>';
+
+  // Skills
+  const skills = [
+    { id:'sk-cleaning',    label:'Cleaning'       },
+    { id:'sk-washing',     label:'Washing'        },
+    { id:'sk-babysitting', label:'Baby Sitting'   },
+    { id:'sk-cooking',     label:'Arabic Cooking' },
+    { id:'sk-driving',     label:'Driving'        },
+  ];
+  document.getElementById('pdf-skills-table').innerHTML = skills.map(s =>
+    `<tr><td class="pdf-skill-label">${s.label}</td>
+     <td class="pdf-skill-check"><span class="pdf-boxcb ${f[s.id] ? 'checked' : ''}">${f[s.id] ? '✕' : ''}</span></td></tr>`
+  ).join('');
+
+  // Languages
+  document.getElementById('pdf-lang-tbody').innerHTML = [
+    { lang:'English', speak:f['lang-en-speak'], write:f['lang-en-write'] },
+    { lang:'Arabic',  speak:f['lang-ar-speak'], write:f['lang-ar-write'] },
+  ].map(l => `<tr><td>${l.lang}</td>
+    <td><span class="pdf-boxcb">${l.speak ? '✕' : ''}</span></td>
+    <td><span class="pdf-boxcb">${l.write ? '✕' : ''}</span></td></tr>`).join('');
+
+  // Ref block
+  document.getElementById('pdf-ref-under').innerHTML =
+    `<div class="pdf-ref-no">Ref No. ${escHtml(f['f-refno']||'')}</div>
+     <div class="pdf-ref-name">${escHtml(f['f-name']||'')}</div>`;
+
+  // Personal
+  document.getElementById('pdf-personal-table').innerHTML = [
+    ['Nationality',    f['f-nationality']||''],
+    ['Religion',       f['f-religion']||''],
+    ['D.O.B',          dateLabel(f['f-dob'])],
+    ['Age',            f['f-age']||''],
+    ['Height',         f['f-height']||''],
+    ['Weight',         f['f-weight']||''],
+    ['Marital Status', f['f-marital']||''],
+    ['Children (No.)', f['f-children']||''],
+  ].map(([l,v]) => `<tr><td class="pdf-lbl">${l}</td><td class="pdf-val">${escHtml(v)}</td></tr>`).join('');
+
+  // Passport
+  document.getElementById('pdf-passport-table').innerHTML = [
+    ['Passport No.',   f['f-passport']||''],
+    ['Date of Issue',  dateLabel(f['f-doi'])],
+    ['Date of Expiry', dateLabel(f['f-doe'])],
+    ['Place of Issue', f['f-pissue']||''],
+  ].map(([l,v]) => `<tr><td class="pdf-lbl">${l}</td><td class="pdf-val">${escHtml(v)}</td></tr>`).join('');
+
+  // Education
+  document.getElementById('pdf-edu-table').innerHTML =
+    `<tr><th colspan="2" class="pdf-table-section">EDUCATIONAL QUALIFICATION</th></tr>
+     <tr><td class="pdf-lbl">GRADE</td><td class="pdf-val">${escHtml(f['f-edu']||'')}</td></tr>
+     <tr><td class="pdf-lbl">YEAR</td><td class="pdf-val">${escHtml(f['f-eduyear']||'')}</td></tr>`;
+
+  // Employment
+  const empRows = f.empRows || [];
+  document.getElementById('pdf-emp-tbody').innerHTML = empRows.length
+    ? empRows.map(r => `<tr><td>${escHtml(r.position)}</td><td>${escHtml(r.country)}</td><td>${escHtml(r.period)}</td></tr>`).join('')
+    : '<tr><td colspan="3" style="color:#aac4ce;text-align:center;font-size:7pt;">—</td></tr>';
+
+  // Footer
+  const lines = [f['footer-1'], f['footer-2'], f['footer-3']].filter(Boolean);
+  document.getElementById('pdf-footer').innerHTML = lines.map(l => escHtml(l)).join('<br/>') || '&nbsp;';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Profile view modal
+// ═══════════════════════════════════════════════════════════════
+function openProfileModal(id) {
+  const ap = allApplicants.find(a => a.id === id);
+  if (!ap) return;
+  const tr     = ap.tracking || {};
+  const status = getStatus(tr);
+  const badgeClass = { ready:'ready', complete:'complete', progress:'progress', pending:'pending', sent:'sent', cancelled:'cancelled' }[status];
+  const headshot = ap.headshot
+    ? `<img src="uploads/${escHtml(ap.headshot)}" alt="" />`
+    : '👤';
+  const row = (lbl, val) => val ? `<div class="pv-row"><span class="pv-lbl">${lbl}</span><span class="pv-val">${escHtml(String(val))}</span></div>` : '';
+  const steps = STEPS.map(s =>
+    `<span class="pv-step ${tr[s.key] ? 'done' : 'pd'}">${tr[s.key] ? '✓' : '○'} ${s.label}</span>`
+  ).join('');
+
+  document.getElementById('pv-title').textContent = ap.name || '(Unnamed)';
+  document.getElementById('pv-dl-btn').onclick = (e) => { e.stopPropagation(); downloadCV(id); };
+  document.getElementById('pv-body').innerHTML = `
+    <div class="pv-top">
+      <div class="pv-headshot">${headshot}</div>
+      <div class="pv-info">
+        <div class="pv-name">${escHtml(ap.name || '(Unnamed)')}</div>
+        <div class="pv-role">${escHtml(ap.role || '')}${tr.experience ? ' · ' + escHtml(tr.experience) : ''}</div>
+        ${ap.age ? `<div class="pv-role">Age: ${escHtml(ap.age)}</div>` : ''}
+        <span class="badge ${badgeClass}">${STATUS_LABEL[status]}</span>
+      </div>
+    </div>
+    <div class="pv-section">
+      <div class="pv-section-title">Processing Steps</div>
+      <div class="pv-steps">${steps}</div>
+      ${row('Musaned Date', tr.musaned ? dateLabel(tr.musaned) : '')}
+      ${row('Ticket Date',  tr.ticketDate ? dateLabel(tr.ticketDate) : '')}
+      ${tr.notes ? `<div class="pv-row"><span class="pv-lbl">Notes</span><span class="pv-val">${escHtml(tr.notes)}</span></div>` : ''}
+    </div>
+  `;
+  document.getElementById('profile-view-modal').classList.add('open');
+}
+
+function closeProfileModal() {
+  document.getElementById('profile-view-modal').classList.remove('open');
+}
+
+document.addEventListener('click', e => {
+  const m = document.getElementById('profile-view-modal');
+  if (e.target === m) m.classList.remove('open');
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Tab switching
+// ═══════════════════════════════════════════════════════════════
+function switchAgentTab(tab) {
+  if (tab === 'browse' && !currentAgent?.settings?.allowAgentBrowse) tab = 'mine';
+  document.getElementById('atab-mine').classList.toggle('active',   tab === 'mine');
+  document.getElementById('atab-browse').classList.toggle('active', tab === 'browse');
+  document.getElementById('mine-section').style.display   = tab === 'mine'   ? 'block' : 'none';
+  document.getElementById('browse-section').style.display = tab === 'browse' ? 'block' : 'none';
+  if (tab === 'browse') loadBrowseProfiles();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Browse & Request
+// ═══════════════════════════════════════════════════════════════
+let allBrowseProfiles = [];
+
+async function loadBrowseProfiles() {
+  const token = currentAgent?.token || localStorage.getItem('agentToken') || '';
+  const grid  = document.getElementById('browse-grid');
+  grid.innerHTML = '<div class="empty-state"><p>Loading profiles…</p></div>';
+  try {
+    const res  = await fetch(`api/agent_browse.php?token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    allBrowseProfiles = data.profiles || [];
+    renderBrowseGrid();
+  } catch(e) {
+    grid.innerHTML = `<div class="empty-state"><p>Failed to load: ${escHtml(e.message)}</p></div>`;
+  }
+}
+
+function renderBrowseGrid() {
+  const grid = document.getElementById('browse-grid');
+  if (!allBrowseProfiles.length) {
+    grid.innerHTML = '<div class="empty-state"><p>No profiles available.</p></div>';
+    return;
+  }
+  grid.innerHTML = allBrowseProfiles.map(p => {
+    const photo = p.headshot
+      ? `<img src="uploads/${escHtml(p.headshot)}" alt="" onerror="this.parentElement.innerHTML='<span style=font-size:2rem;opacity:.3>👤</span>'" />`
+      : `<span style="font-size:2rem;opacity:.3">👤</span>`;
+    const btnLabel = p.status === 'assigned'  ? '✓ Assigned'
+                   : p.status === 'requested' ? '✓ Requested — Cancel'
+                   : 'Request';
+    const disabled = p.status === 'assigned' ? 'disabled' : '';
+    return `<div class="browse-card ${escHtml(p.status)}">
+      <div class="browse-photo">${photo}</div>
+      <div class="browse-body">
+        <div class="browse-name">${escHtml(p.name || '(Unnamed)')}</div>
+        <div class="browse-meta">${escHtml(p.role || '')}</div>
+        ${p.experience ? `<div class="browse-meta">${escHtml(p.experience)}</div>` : ''}
+        ${p.age ? `<div class="browse-meta">Age: ${escHtml(p.age)}</div>` : ''}
+      </div>
+      <div class="browse-footer">
+        <button class="btn-request ${escHtml(p.status)}" id="breq-${p.id}"
+          onclick="toggleRequest('${p.id}')" ${disabled}>${btnLabel}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleRequest(profileId) {
+  const btn = document.getElementById('breq-' + profileId);
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const token = currentAgent?.token || localStorage.getItem('agentToken') || '';
+    const res   = await fetch('api/agent_request.php', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ token, profileId, action: 'toggle' })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    const idx = allBrowseProfiles.findIndex(p => p.id === profileId);
+    if (idx !== -1) allBrowseProfiles[idx].status = data.status;
+    renderBrowseGrid();
+    showToast(data.status === 'requested' ? 'Request sent to admin' : 'Request cancelled');
+  } catch(e) {
+    showToast('Error: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Request'; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Keyboard
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Boot
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('load', tryAutoLogin);
+</script>
+</body>
+</html>

@@ -1,0 +1,270 @@
+// Topway Applicant System — database schema
+// See CLAUDE.md for the full spec this was generated from.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApplicationStatus {
+  ACTIVE
+  ON_HOLD
+  CANCELLED
+}
+
+enum DisputeType {
+  NONE
+  RUNAWAY
+  REFUSAL_TO_WORK
+  MEDICALLY_UNFIT
+  OTHER
+}
+
+enum WorkerCategory {
+  FIRST_TIMER
+  EXPERIENCED
+  CONTRACTED
+}
+
+enum Role {
+  ADMIN
+  STAFF
+  AGENT
+}
+
+enum DestCountry {
+  SAUDI_ARABIA
+  KUWAIT
+  OMAN
+  QATAR
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  username     String     @unique
+  email        String     @unique
+  passwordHash String
+  role         Role
+  permissions  Json // { applications: bool, databank: bool, invoices: bool, agents: bool, tracking: bool }
+  agentProfile Agent?
+  sessions     Session[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime   @default(now())
+  isActive     Boolean    @default(true)
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ipAddress String?
+
+  @@index([userId])
+}
+
+model Agent {
+  id             String      @id @default(cuid())
+  userId         String      @unique
+  user           User        @relation(fields: [userId], references: [id])
+  companyName    String
+  country        String
+  logoR2Key      String?
+  dataBankAccess Boolean     @default(false)
+  placements     Placement[]
+}
+
+model Candidate {
+  id               String         @id @default(cuid())
+  fullName         String
+  nationality      String
+  dateOfBirth      DateTime
+  passportNumber   String
+  passportExpiry   DateTime
+  phone            String?
+  address          String?
+  religion         String?
+  category         WorkerCategory
+  skills           String[]
+  languages        String[]
+  yearsExperience  Int            @default(0)
+  contractDuration Int // months, typically 24
+  inDatabank       Boolean        @default(false)
+  documents        Document[]
+  placements       Placement[]
+  tracking         Tracking?
+  disputes         Dispute[]
+  invoiceItems     InvoiceItem[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([category])
+  @@index([inDatabank])
+}
+
+model Tracking {
+  id          String    @id @default(cuid())
+  candidateId String    @unique
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+
+  applicationStatus ApplicationStatus @default(ACTIVE)
+  onHoldReason      String?
+  onHoldAt          DateTime?
+
+  // Visa pipeline
+  musanedDate DateTime?
+  enjazDate   DateTime?
+  bureauDate  DateTime?
+  wakalahDate DateTime?
+  embassyDate DateTime?
+  paymentDate DateTime?
+
+  // Departure & milestones — set together, never separately
+  departureDate      DateTime?
+  destinationCountry DestCountry?
+
+  // Computed on save of departureDate, stored for queryability
+  probationEndDate        DateTime?
+  contractMidDate          DateTime?
+  contractEndDate          DateTime?
+  contractClosureNotified Boolean   @default(false)
+
+  notes     String?
+  updatedAt DateTime @updatedAt
+
+  @@index([applicationStatus])
+}
+
+// Probation rules (stored in code as a const, not a DB table):
+// SAUDI_ARABIA: 90 days | KUWAIT: 180 days | OMAN: 180 days | QATAR: 270 days
+
+model Placement {
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  agentId     String
+  agent       Agent     @relation(fields: [agentId], references: [id])
+
+  employerName    String?
+  startDate       DateTime  @default(now())
+  endDate         DateTime?
+  isCurrent       Boolean   @default(true)
+  changeReason    String?
+  remarketingDate DateTime? // when set, grants new agent visibility
+
+  createdAt DateTime @default(now())
+
+  @@index([candidateId])
+  @@index([agentId])
+}
+
+model Dispute {
+  id          String      @id @default(cuid())
+  candidateId String
+  candidate   Candidate   @relation(fields: [candidateId], references: [id])
+  type        DisputeType
+  notes       String?
+  resolvedAt  DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@index([candidateId])
+}
+
+model Document {
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  type        String // "headshot" | "fullphoto" | "passport" | "alteration"
+  r2Key       String // opaque UUID, never exposed to browser
+  mimeType    String
+  sizeBytes   Int
+  uploadedAt  DateTime  @default(now())
+
+  @@index([candidateId])
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  number      String        @unique // auto-generated sequential
+  status      String // "DRAFT" | "SENT" | "PAID" | "VOID"
+  agentId     String?
+  items       InvoiceItem[]
+  totalAmount Decimal
+  currency    String        @default("USD")
+  notes       String?
+  issuedAt    DateTime?
+  dueAt       DateTime?
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model InvoiceItem {
+  id          String     @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice    @relation(fields: [invoiceId], references: [id])
+  candidateId String?
+  candidate   Candidate? @relation(fields: [candidateId], references: [id])
+  description String
+  amount      Decimal
+  quantity    Int        @default(1)
+
+  @@index([invoiceId])
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  userId      String // who receives it
+  type        String // "CONTRACT_CLOSED" | "PROBATION_COMPLETE" | etc.
+  seenAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([candidateId])
+}
+
+// Singleton (one row, fixed id "singleton") holding company bank details
+// and contact footer used on generated invoice PDFs. Not part of the
+// originally specified 12 models — added because the Invoicing Portal spec
+// explicitly requires "bank details stored in DB, editable by admin only"
+// and there's nowhere else for it to live. See CLAUDE.md Phase 2 notes.
+model CompanySettings {
+  id          String   @id @default("singleton")
+  bankName    String?
+  accountNo   String?
+  accountName String?
+  swiftCode   String?
+  email       String?
+  phone       String?
+  fax         String?
+  address     String?
+  website     String?
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  actorId     String
+  actor       User       @relation(fields: [actorId], references: [id])
+  entityType  String
+  entityId    String
+  action      String
+  diff        Json
+  createdAt   DateTime   @default(now())
+  candidateId String?
+  candidate   Candidate? @relation(fields: [candidateId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([candidateId])
+}

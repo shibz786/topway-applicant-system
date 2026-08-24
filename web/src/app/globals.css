@@ -1,0 +1,184 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens — Topway Private Limited. "The Register" direction.
+ *
+ * The brand teal/ink is real, pre-existing identity (public/logo.png) and
+ * is NOT up for reinvention — #16242c ink, #2b6f80 teal, sampled straight
+ * from the mark. What changed in this pass (picked by the user from two
+ * full mockup directions, see the "Redesign — Direction 2" entry in
+ * CLAUDE.md) is everything else: this agency spends its day on passports,
+ * licenses, and case files, so the palette leans into a warm stone/paper
+ * ground instead of a cool grey porcelain one, and headings move to
+ * Fraunces — a serif with real document-office gravitas — instead of a
+ * geometric sans, paired with Inter for body/UI and IBM Plex Mono for
+ * anything that's a figure or a reference number (invoice numbers,
+ * passport numbers, KPI counts) so data reads as counted, not decorated.
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-plex-mono);
+  --font-heading: var(--font-fraunces);
+  --color-good: var(--good);
+  --color-good-foreground: var(--good-foreground);
+  --color-warn: var(--warn);
+  --color-warn-foreground: var(--warn-foreground);
+  --color-critical: var(--critical);
+  --color-critical-foreground: var(--critical-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-teal-bright: var(--brand-teal-bright);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* Brand primitives — the mark's own colors, named, kept stable across
+     light/dark so gradients and one-off brand moments (login screen) can
+     reach for them directly instead of the semantic (and per-mode) tokens
+     below. */
+  --brand-ink: #16242c;
+  --brand-teal: #2b6f80;
+  --brand-teal-deep: #1c4a56;
+  --brand-teal-bright: #4fa3b8;
+
+  --background: #f1efe9; /* warm stone paper — not a straight cream */
+  --foreground: #20302e; /* teal-black ink */
+  --card: #fbfaf7;
+  --card-foreground: #20302e;
+  --popover: #fbfaf7;
+  --popover-foreground: #20302e;
+  --primary: #2b6f80; /* brand teal */
+  --primary-foreground: #f7fbfc;
+  --secondary: #e8e2d3;
+  --secondary-foreground: #29332f;
+  --muted: #eae4d6;
+  --muted-foreground: #767e70;
+  --accent: #e1ece8;
+  --accent-foreground: #1c4a56;
+  --destructive: #a3402f;
+  --border: #d9d3c4;
+  --input: #d3cbb6;
+  --ring: #2b6f80;
+  --good: #3d7a52;
+  --good-foreground: #f4faf5;
+  --warn: #a06a2e;
+  --warn-foreground: #fdf8f0;
+  --critical: #a3402f;
+  --critical-foreground: #fdf3f1;
+  --chart-1: #2b6f80;
+  --chart-2: #1c4a56;
+  --chart-3: #7fa89c;
+  --chart-4: #a06a2e;
+  --chart-5: #c9903f;
+  --radius: 0.6rem;
+  --sidebar: #eae4d6;
+  --sidebar-foreground: #20302e;
+  --sidebar-primary: #2b6f80;
+  --sidebar-primary-foreground: #f7fbfc;
+  --sidebar-accent: #e1ece8;
+  --sidebar-accent-foreground: #1c4a56;
+  --sidebar-border: #d9d3c4;
+  --sidebar-ring: #2b6f80;
+}
+
+.dark {
+  --background: #171c19; /* warm near-black, teal-green cast — not a neutral gray */
+  --foreground: #eae7de;
+  --card: #1f2521;
+  --card-foreground: #eae7de;
+  --popover: #1f2521;
+  --popover-foreground: #eae7de;
+  --primary: #5fb3c6; /* brighter teal — holds contrast on the dark stone surface */
+  --primary-foreground: #10181a;
+  --secondary: #2a2f29;
+  --secondary-foreground: #eae7de;
+  --muted: #262b25;
+  --muted-foreground: #9aa397;
+  --accent: #29393a;
+  --accent-foreground: #b9e0e7;
+  --destructive: #d47a63;
+  --border: rgba(234, 227, 216, 0.12);
+  --input: rgba(234, 227, 216, 0.16);
+  --ring: #5fb3c6;
+  --good: #5fa878;
+  --good-foreground: #10180f;
+  --warn: #c99552;
+  --warn-foreground: #1a130a;
+  --critical: #d47a63;
+  --critical-foreground: #1c0f0a;
+  --chart-1: #5fb3c6;
+  --chart-2: #2b6f80;
+  --chart-3: #7fa89c;
+  --chart-4: #c99552;
+  --chart-5: #d9a35b;
+  --sidebar: #1f2521;
+  --sidebar-foreground: #eae7de;
+  --sidebar-primary: #5fb3c6;
+  --sidebar-primary-foreground: #10181a;
+  --sidebar-accent: #29393a;
+  --sidebar-accent-foreground: #b9e0e7;
+  --sidebar-border: rgba(234, 227, 216, 0.12);
+  --sidebar-ring: #5fb3c6;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading;
+  }
+}

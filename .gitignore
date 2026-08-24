@@ -1,0 +1,12 @@
+# Legacy app's real candidate data — names, passport numbers, and 126 real
+# candidate photos/documents. Already fully migrated into the new app's
+# Postgres DB (web/scripts/migrate-legacy-data.ts) and file storage
+# (web/scripts/migrate-legacy-files.ts) — nothing here is needed to run or
+# deploy the app. Never pushed to GitHub, public repo or not.
+/data/
+/uploads/
+
+.DS_Store
+
+# Claude Code local session state — not meant to be shared.
+/.claude/

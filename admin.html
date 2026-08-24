@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Topway – Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --teal:#2B7A8C; --teal2:#1F5F6E; --teal-light:#EAF4F6;
+      --green:#27AE60; --amber:#E67E22; --red:#E74C3C;
+      --grey:#6B7280; --bg:#F0F4F6; --card:#FFFFFF;
+      --border:#D1D9E0; --text:#1A2B35; --muted:#8899A6; --radius:10px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+    /* Toast */
+    #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1A2B35;color:#fff;padding:10px 20px;border-radius:8px;font-size:.875rem;opacity:0;transition:all .3s;z-index:9999;white-space:nowrap;pointer-events:none;}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+    /* ── LOGIN ── */
+    #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1A2B35 0%,#2B7A8C 100%);padding:24px;}
+    .login-card{background:#fff;border-radius:16px;padding:48px 40px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.2);}
+    .login-logo{text-align:center;margin-bottom:28px;}
+    .login-logo img{height:48px;object-fit:contain;}
+    .login-logo-text{font-size:1.6rem;font-weight:800;color:var(--teal);letter-spacing:-.5px;}
+    .login-badge{display:inline-block;background:#FEF9E7;color:#9A7D0A;font-size:.68rem;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.08em;margin-top:5px;}
+    .login-title{font-size:1.1rem;font-weight:700;text-align:center;margin-bottom:22px;}
+    .field{margin-bottom:14px;}
+    .field label{display:block;font-size:.75rem;font-weight:700;color:var(--grey);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
+    .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.9rem;font-family:inherit;outline:none;transition:border-color .2s;}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--teal);}
+    .field textarea{resize:vertical;min-height:68px;}
+    .btn{padding:8px 15px;border:none;border-radius:7px;font-size:.84rem;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+    .btn-primary{background:var(--teal);color:#fff;}
+    .btn-primary:hover{background:var(--teal2);}
+    .btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+    .btn-danger{background:#FADBD8;color:var(--red);}
+    .btn-danger:hover{background:#F1948A;color:#fff;}
+    .btn-ghost{background:#F2F3F4;color:var(--text);}
+    .btn-ghost:hover{background:#E5E7E9;}
+    .btn-teal-outline{background:transparent;color:var(--teal);border:1.5px solid var(--teal);}
+    .btn-teal-outline:hover{background:var(--teal-light);}
+    .btn-sm{padding:5px 11px;font-size:.76rem;}
+    .btn-full{width:100%;justify-content:center;padding:12px;font-size:.95rem;}
+    #login-error{color:var(--red);font-size:.82rem;text-align:center;margin-top:10px;display:none;}
+
+    /* ── APP SHELL ── */
+    #admin-app{display:none;flex-direction:column;min-height:100vh;}
+    .admin-header{background:linear-gradient(135deg,#1A2B35 0%,#2B7A8C 100%);padding:0 28px;height:60px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2);}
+    .admin-header img{height:32px;object-fit:contain;filter:brightness(0) invert(1);}
+    .admin-header-title{flex:1;font-size:.95rem;font-weight:700;color:#fff;}
+    .admin-header-badge{font-size:.68rem;background:rgba(255,255,255,.15);color:#fff;padding:3px 10px;border-radius:12px;font-weight:600;}
+    .btn-logout{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);padding:6px 13px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;}
+    .btn-logout:hover{background:rgba(255,255,255,.22);}
+
+    /* Tabs */
+    .tab-bar{background:#fff;border-bottom:1px solid var(--border);padding:0 28px;display:flex;gap:0;position:sticky;top:60px;z-index:90;}
+    .tab-btn{padding:13px 20px;font-size:.875rem;font-weight:600;color:var(--muted);border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-family:inherit;transition:all .2s;white-space:nowrap;}
+    .tab-btn.active{color:var(--teal);border-bottom-color:var(--teal);}
+    .tab-btn:hover:not(.active){color:var(--text);}
+
+    /* Body */
+    .admin-body{padding:24px 28px;max-width:1200px;margin:0 auto;width:100%;}
+    .tab-panel{display:none;}
+    .tab-panel.active{display:block;}
+
+    /* Section header */
+    .sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+    .sec-header h2{font-size:1rem;font-weight:700;}
+    .sec-header p{font-size:.78rem;color:var(--muted);margin-top:2px;}
+
+    /* Info box */
+    .info-box{background:var(--teal-light);border-left:3px solid var(--teal);padding:11px 14px;border-radius:0 7px 7px 0;margin-bottom:20px;font-size:.82rem;color:var(--teal2);}
+
+    /* ── PROFILE CARDS ── */
+    .profiles-grid{display:flex;flex-direction:column;gap:12px;}
+    .profile-card{background:var(--card);border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;transition:border-color .2s;}
+    .profile-card:hover{border-color:var(--teal);}
+    .profile-card-main{display:flex;align-items:center;gap:16px;padding:14px 18px;}
+    .profile-thumb{width:52px;height:62px;border-radius:7px;object-fit:cover;flex-shrink:0;background:#EAF4F6;}
+    .profile-thumb-empty{width:52px;height:62px;border-radius:7px;background:var(--teal-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--teal);font-size:1.4rem;}
+    .profile-info{flex:1;min-width:0;}
+    .profile-name{font-size:.95rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .profile-role{font-size:.75rem;color:var(--muted);margin-top:2px;}
+    .profile-pipeline{display:flex;align-items:center;gap:3px;margin-top:7px;}
+    .pipe-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+    .pipe-dot.done{background:var(--green);}
+    .pipe-dot.pending-dot{background:#D1D9E0;}
+    .pipe-label{font-size:.68rem;color:var(--muted);margin-left:5px;}
+    .profile-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+    .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.68rem;font-weight:700;white-space:nowrap;}
+    .badge.ready{background:#D5F5E3;color:#1E8449;}
+    .badge.complete{background:#D6EAF8;color:#1A5276;}
+    .badge.progress{background:#FEF9E7;color:#9A7D0A;}
+    .badge.pending-s{background:#F2F3F4;color:#717D7E;}
+    .badge.cancelled{background:#FADBD8;color:#922B21;}
+    .badge.sent{background:#E8DAEF;color:#6D3460;}
+    .ats-row.sent{background:#FBF7FD;}
+    .ats-row.sent .ats-name{color:#6D3460;}
+    .browse-setting{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;}
+    .browse-setting strong{font-size:.86rem;display:block;}
+    .browse-setting span{font-size:.75rem;color:var(--muted);}
+    .mini-toggle{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;color:var(--teal2);cursor:pointer;white-space:nowrap;}
+    .mini-toggle input{width:17px;height:17px;accent-color:var(--teal);}
+
+    /* Status panel (inline collapsible) */
+    .status-panel{display:none;padding:16px 18px;border-top:1px solid var(--border);background:#FAFCFD;}
+    .status-panel.open{display:block;}
+    .status-panel-inner{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+    .steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+    .step-check{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;font-size:.82rem;font-weight:600;transition:all .15s;user-select:none;}
+    .step-check:hover{border-color:var(--teal);background:var(--teal-light);}
+    .step-check.checked{border-color:var(--green);background:#EAF9EE;}
+    .step-check-box{width:16px;height:16px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.7rem;background:#fff;transition:all .15s;}
+    .step-check.checked .step-check-box{background:var(--green);border-color:var(--green);color:#fff;}
+    .status-dates{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
+    .status-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+
+    /* ── AGENT CARDS ── */
+    .agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+    .agent-card{background:var(--card);border-radius:var(--radius);padding:20px;border:1.5px solid var(--border);transition:border-color .2s;}
+    .agent-card:hover{border-color:var(--teal);}
+    .agent-card-header{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;}
+    .agent-avatar{width:44px;height:44px;border-radius:10px;background:var(--teal-light);display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:800;color:var(--teal);flex-shrink:0;overflow:hidden;}
+    .agent-avatar img{width:100%;height:100%;object-fit:contain;}
+    .agent-card-title{flex:1;}
+    .agent-card-title h3{font-size:.9rem;font-weight:700;}
+    .agent-card-title p{font-size:.75rem;color:var(--muted);margin-top:2px;}
+    .agent-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:5px;}
+    .agent-dot.off{background:#D1D9E0;}
+    .agent-meta{font-size:.75rem;color:var(--grey);margin-bottom:12px;}
+    .agent-meta span{margin-right:10px;}
+    .agent-actions{display:flex;gap:7px;flex-wrap:wrap;}
+
+    /* ── MODAL ── */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:20px;}
+    .modal-overlay.open{display:flex;}
+    .modal{background:#fff;border-radius:14px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.22);}
+    .modal.modal-wide{max-width:720px;}
+
+    /* Profile view modal */
+    .pv-top{display:flex;gap:18px;margin-bottom:18px;align-items:flex-start;}
+    .pv-photos{display:flex;flex-direction:column;gap:8px;flex-shrink:0;}
+    .pv-headshot{width:90px;height:110px;border-radius:8px;overflow:hidden;background:#EAF4F6;display:flex;align-items:center;justify-content:center;font-size:2rem;}
+    .pv-headshot img{width:100%;height:100%;object-fit:cover;}
+    .pv-info{flex:1;}
+    .pv-name{font-size:1.2rem;font-weight:800;margin-bottom:2px;}
+    .pv-role{font-size:.85rem;color:var(--muted);margin-bottom:10px;}
+    .pv-pipeline{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
+    .pv-section{margin-bottom:14px;}
+    .pv-section-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+    .pv-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;}
+    .pv-row{display:flex;gap:6px;font-size:.82rem;padding:2px 0;}
+    .pv-lbl{color:var(--muted);font-weight:600;min-width:110px;flex-shrink:0;}
+    .pv-val{font-weight:500;}
+    .pv-contact{background:#FFF8F0;border:1px solid #FDEBD0;border-radius:8px;padding:12px 14px;margin-top:6px;}
+    .pv-contact .pv-section-title{color:#9A7D0A;}
+    .pv-steps{display:flex;gap:6px;flex-wrap:wrap;}
+    .pv-step{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:700;}
+    .pv-step.done{background:#D5F5E3;color:#1E8449;}
+    .pv-step.pd{background:#F2F3F4;color:#999;}
+    .profile-card-main{cursor:pointer;}
+    .modal-header{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;}
+    .modal-header h2{font-size:1rem;font-weight:700;}
+    .modal-close{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted);line-height:1;padding:2px 6px;}
+    .modal-body{padding:22px;}
+    .modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .field-hint{font-size:.72rem;color:var(--muted);margin-top:4px;}
+
+    /* Profile checklist in assign modal */
+    .assign-list{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding-right:4px;}
+    .assign-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s;}
+    .assign-item:hover{border-color:var(--teal);background:var(--teal-light);}
+    .assign-item.checked{border-color:var(--teal);background:var(--teal-light);}
+    .assign-item img{width:36px;height:42px;object-fit:cover;border-radius:5px;flex-shrink:0;background:#EAF4F6;}
+    .assign-item-info{flex:1;}
+    .assign-item-info strong{font-size:.85rem;font-weight:700;display:block;}
+    .assign-item-info span{font-size:.73rem;color:var(--muted);}
+    .assign-item input{accent-color:var(--teal);width:16px;height:16px;pointer-events:none;flex-shrink:0;}
+    .assign-item.pending-req{border-color:var(--amber);}
+    .assign-item.pending-req:hover{border-color:var(--amber);background:#FEF9E7;}
+    .assign-item.pending-req.checked{border-color:var(--teal);background:var(--teal-light);}
+    .req-tag{font-size:.65rem;font-weight:700;padding:2px 6px;border-radius:20px;background:#FEF9E7;color:#9A7D0A;white-space:nowrap;}
+    .pending-badge{display:inline-flex;align-items:center;gap:4px;background:#FEF9E7;color:#9A7D0A;border:1px solid #E67E22;font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:20px;}
+
+    /* Logo upload */
+    .logo-upload-area{border:2px dashed var(--border);border-radius:9px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;margin-top:6px;}
+    .logo-upload-area:hover{border-color:var(--teal);background:var(--teal-light);}
+    .logo-upload-area img{max-height:48px;max-width:120px;object-fit:contain;display:block;margin:0 auto 8px;}
+    .logo-upload-area p{font-size:.75rem;color:var(--muted);}
+
+    /* Empty state */
+    .empty-state{text-align:center;padding:48px 20px;color:var(--muted);}
+    .empty-state svg{opacity:.25;margin-bottom:12px;}
+    .empty-state p{font-size:.9rem;}
+
+    /* ── ATS TOOLBAR ── */
+    .ats-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:12px 14px;background:#fff;border-radius:var(--radius);border:1px solid var(--border);}
+    .ats-toolbar input,.ats-toolbar select{padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:.82rem;font-family:inherit;outline:none;transition:border-color .2s;background:#fff;}
+    .ats-toolbar input:focus,.ats-toolbar select:focus{border-color:var(--teal);}
+    .ats-toolbar input{flex:1;min-width:160px;}
+    .ats-count{font-size:.78rem;color:var(--muted);white-space:nowrap;margin-left:auto;}
+
+    /* ── ATS TABLE ── */
+    .ats-table-wrap{overflow-x:visible;background:#fff;border-radius:var(--radius);border:1px solid var(--border);}
+    .ats-table{width:100%;border-collapse:collapse;font-size:.76rem;table-layout:fixed;}
+    .ats-table th{padding:8px 6px;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);border-bottom:2px solid var(--border);white-space:nowrap;background:#F8FAFB;}
+    .ats-table td{padding:8px 6px;border-bottom:1px solid #F0F4F6;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .ats-table th:nth-child(1),.ats-table td:nth-child(1){width:34px;}
+    .ats-table th:nth-child(2),.ats-table td:nth-child(2){width:44px;}
+    .ats-table th:nth-child(3),.ats-table td:nth-child(3){width:17%;}
+    .ats-table th:nth-child(4),.ats-table td:nth-child(4){width:8%;}
+    .ats-table th:nth-child(5),.ats-table td:nth-child(5){width:8%;}
+    .ats-table th:nth-child(6),.ats-table td:nth-child(6){width:42px;}
+    .ats-table th:nth-child(7),.ats-table td:nth-child(7){width:10%;}
+    .ats-table th:nth-child(8),.ats-table td:nth-child(8),
+    .ats-table th:nth-child(16),.ats-table td:nth-child(16),
+    .ats-table th:nth-child(17),.ats-table td:nth-child(17){width:72px;}
+    .ats-table th:nth-child(9),.ats-table td:nth-child(9){width:48px;}
+    .ats-table th:nth-child(n+10):nth-child(-n+15),.ats-table td:nth-child(n+10):nth-child(-n+15){width:38px;text-align:center;}
+    .ats-table th:nth-child(18),.ats-table td:nth-child(18){width:92px;}
+    .ats-table th:nth-child(19),.ats-table td:nth-child(19){width:140px;}
+    .ats-row{cursor:pointer;transition:background .15s;}
+    .ats-row:hover{background:#F8FAFB;}
+    .ats-row.row-open{background:var(--teal-light);}
+    .ats-name{font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;}
+    .ats-muted{color:var(--muted);}
+    .ats-actions-cell{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;}
+    .ats-actions-cell .btn-act{margin:1px 1px;}
+    .step-tick-yes{color:var(--green);font-weight:700;}
+    .step-tick-no{color:#D1D9E0;}
+    .delay-pill{display:inline-block;padding:2px 7px;border-radius:20px;font-size:.68rem;font-weight:700;}
+    .delay-pill.ok{background:#D5F5E3;color:#1E8449;}
+    .delay-pill.warn{background:#FEF9E7;color:#9A7D0A;}
+    .delay-pill.late{background:#FADBD8;color:#922B21;}
+    .delay-pill.none{background:#F2F3F4;color:#999;}
+    .btn-act{padding:4px 9px;border:none;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;}
+    .btn-act-status{background:var(--teal-light);color:var(--teal2);}
+    .btn-act-status:hover{background:var(--teal);color:#fff;}
+    .btn-act-builder{background:#EEF2FF;color:#3730A3;}
+    .btn-act-builder:hover{background:#6366F1;color:#fff;}
+    .btn-act-delete{background:#FADBD8;color:var(--red);}
+    .btn-act-delete:hover{background:var(--red);color:#fff;}
+
+    /* ── ATS EXPAND ROW ── */
+    .ats-expand-row>td{padding:0;border-bottom:2px solid var(--teal);overflow:visible!important;white-space:normal!important;text-overflow:clip!important;}
+    .ats-expand-panel{padding:18px 20px;background:#F8FAFB;display:none;}
+    .ats-expand-panel.open{display:block;}
+
+    /* ── CATEGORY FILTER PILLS ── */
+    .cat-filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+    .cat-pill{padding:6px 14px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;}
+    .cat-pill:hover{border-color:var(--teal);color:var(--teal);}
+    .cat-pill.active{border-color:var(--teal);background:var(--teal);color:#fff;}
+    .cat-pill.active.exp{background:#1E8449;border-color:#1E8449;}
+    .cat-pill.active.new{background:#1A5276;border-color:#1A5276;}
+    .cat-pill.active.contracted{background:#6D3460;border-color:#6D3460;}
+    .cat-badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700;vertical-align:middle;margin-left:5px;}
+    .cat-badge.exp{background:#D5F5E3;color:#1E8449;}
+    .cat-badge.new{background:#D6EAF8;color:#1A5276;}
+    .cat-badge.contracted{background:#E8DAEF;color:#6D3460;}
+    .cat-badge.unset{background:#F2F3F4;color:#888;}
+
+    /* ── STEP DATE SUB ── */
+    .step-date-sub{display:block;font-size:.65rem;color:var(--muted);font-weight:400;margin-top:1px;}
+    .step-check.checked .step-date-sub{color:#1E8449;}
+
+    /* ── CONFIRM TOGGLE ── */
+    .confirm-toggle{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:7px;border:1.5px solid var(--border);cursor:pointer;font-size:.82rem;font-weight:600;user-select:none;transition:all .15s;margin-top:10px;}
+    .confirm-toggle:hover{border-color:var(--teal);background:var(--teal-light);}
+    .confirm-toggle.confirmed{border-color:var(--green);background:#EAF9EE;color:#1E8449;}
+    .confirm-toggle.sent{border-color:#8E44AD;background:#F5EEF8;color:#6D3460;}
+
+    @media(max-width:1400px){
+      .ats-table th:nth-child(5),.ats-table td:nth-child(5),
+      .ats-table th:nth-child(6),.ats-table td:nth-child(6),
+      .ats-table th:nth-child(17),.ats-table td:nth-child(17){display:none;}
+      .ats-table th:nth-child(3),.ats-table td:nth-child(3){width:22%;}
+      .ats-table th:nth-child(7),.ats-table td:nth-child(7){width:12%;}
+      .ats-table th:nth-child(19),.ats-table td:nth-child(19){width:132px;}
+    }
+    @media(max-width:1180px){
+      .ats-table th:nth-child(8),.ats-table td:nth-child(8),
+      .ats-table th:nth-child(9),.ats-table td:nth-child(9),
+      .ats-table th:nth-child(16),.ats-table td:nth-child(16){display:none;}
+      .ats-table th:nth-child(3),.ats-table td:nth-child(3){width:28%;}
+    }
+    @media(max-width:640px){
+      .admin-body{padding:16px;}
+      .field-row{grid-template-columns:1fr;}
+      .steps-grid{grid-template-columns:1fr 1fr;}
+      .status-dates{grid-template-columns:1fr;}
+      .ats-table{font-size:.72rem;}
+      .ats-table th,.ats-table td{padding:7px 4px;}
+      .ats-table th:nth-child(2),.ats-table td:nth-child(2),
+      .ats-table th:nth-child(4),.ats-table td:nth-child(4),
+      .ats-table th:nth-child(5),.ats-table td:nth-child(5),
+      .ats-table th:nth-child(6),.ats-table td:nth-child(6),
+      .ats-table th:nth-child(8),.ats-table td:nth-child(8),
+      .ats-table th:nth-child(9),.ats-table td:nth-child(9),
+      .ats-table th:nth-child(16),.ats-table td:nth-child(16),
+      .ats-table th:nth-child(17),.ats-table td:nth-child(17){display:none;}
+      .ats-table th:nth-child(3),.ats-table td:nth-child(3){width:34%;}
+      .ats-table th:nth-child(7),.ats-table td:nth-child(7){width:16%;}
+      .ats-table th:nth-child(n+10):nth-child(-n+15),.ats-table td:nth-child(n+10):nth-child(-n+15){width:30px;}
+      .ats-table th:nth-child(18),.ats-table td:nth-child(18){width:74px;}
+      .ats-table th:nth-child(19),.ats-table td:nth-child(19){width:116px;}
+      .ats-actions-cell .btn-act{font-size:.62rem;padding:4px 5px;}
+    }
+  </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- ══ LOGIN ══════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="logo.png" alt="Topway" onerror="this.style.display='none';document.querySelector('.login-logo-text').style.display='block';" />
+      <div class="login-logo-text" style="display:none">TOPWAY</div>
+      <div><span class="login-badge">Admin Panel</span></div>
+    </div>
+    <div class="login-title">Administrator Sign In</div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="admin-pass" placeholder="Enter admin password" autocomplete="current-password" />
+    </div>
+    <button class="btn btn-primary btn-full" id="btn-admin-login" onclick="doAdminLogin()">Sign In</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- ══ APP ═════════════════════════════════════════════════════ -->
+<div id="admin-app">
+  <header class="admin-header">
+    <img src="logo.png" alt="Topway" onerror="this.style.display='none'" />
+    <div class="admin-header-title">Topway Admin</div>
+    <span class="admin-header-badge">Administrator</span>
+    <button class="btn-logout" onclick="doLogout()">Sign Out</button>
+  </header>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="profiles" onclick="switchTab('profiles')">Applicant Profiles</button>
+    <button class="tab-btn" data-tab="agents" onclick="switchTab('agents')">Foreign Agents</button>
+    <a href="invoice.html" class="tab-btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:5px">🧾 Invoices</a>
+  </div>
+
+  <main class="admin-body">
+
+    <!-- ── PROFILES TAB ── -->
+    <div class="tab-panel active" id="tab-profiles">
+      <div class="sec-header">
+        <div>
+          <h2>Applicant Profiles</h2>
+          <p>Build profiles, update processing status, assign to agents</p>
+        </div>
+        <button class="btn btn-primary" onclick="openBuilder()">+ New Profile</button>
+      </div>
+      <div class="info-box">
+        Click <strong>Open Builder</strong> on any profile to edit it. Use <strong>Status</strong> to update processing steps inline without leaving this page.
+      </div>
+      <div class="cat-filter-bar">
+        <button class="cat-pill active" data-cat="" onclick="setCatFilter(this,'')">All Workers</button>
+        <button class="cat-pill exp"    data-cat="available_exp" onclick="setCatFilter(this,'available_exp')">✔ Experienced</button>
+        <button class="cat-pill new"    data-cat="available_new" onclick="setCatFilter(this,'available_new')">★ Inexperienced</button>
+        <button class="cat-pill contracted" data-cat="contracted" onclick="setCatFilter(this,'contracted')">🔒 Contracted</button>
+      </div>
+      <div class="ats-toolbar">
+        <input type="search" id="ats-search" placeholder="Search name…" oninput="renderAts()" />
+        <select id="ats-filter-status" onchange="renderAts()">
+          <option value="">All Statuses</option>
+          <option value="ready">Ready to Travel</option>
+          <option value="complete">Fully Processed</option>
+          <option value="progress">In Progress</option>
+          <option value="pending">Not Started</option>
+          <option value="sent">Sent</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select id="ats-filter-exp" onchange="renderAts()">
+          <option value="">All Experience</option>
+          <option>HM 21-49 Exp</option><option>HM 50-55 Exp</option>
+          <option>HM 51-55 Exp</option><option>HM - First Time</option>
+          <option>Couple</option><option>Driver</option><option>House Boy</option>
+        </select>
+        <select id="ats-filter-nat" onchange="renderAts()">
+          <option value="">All Nationalities</option>
+        </select>
+        <span class="ats-count" id="ats-count"></span>
+      </div>
+      <div class="ats-table-wrap">
+        <table class="ats-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Photo</th><th>Name</th><th>Role</th>
+              <th>Nat.</th><th>Age</th><th>Experience</th><th>Musaned</th><th>Delay</th>
+              <th title="Medical">Med</th><th title="Enjaz">Enj</th><th title="Bureau">Bur</th>
+              <th title="Wakalah">Wak</th><th title="Embassy">Emb</th><th title="Payment">Pay</th>
+              <th>Ticket</th><th>Saudi Visa</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ats-tbody">
+            <tr><td colspan="19" style="text-align:center;padding:32px;color:var(--muted)">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── AGENTS TAB ── -->
+    <div class="tab-panel" id="tab-agents">
+      <div class="sec-header">
+        <div>
+          <h2>Foreign Agent Accounts</h2>
+          <p>Manage agent logins and control which profiles they can access</p>
+        </div>
+        <button class="btn btn-primary" onclick="openAgentModal()">+ Add Agent</button>
+      </div>
+      <div class="info-box">
+        Agents log in at <strong>agent.html</strong>. Each agent only sees profiles you assign to them. Their uploaded logo appears on PDF exports.
+      </div>
+      <div class="browse-setting">
+        <div>
+          <strong>Agent browse/request access</strong>
+          <span>When off, agents only see applicants assigned to their account.</span>
+        </div>
+        <label class="mini-toggle">
+          <input type="checkbox" id="agent-browse-toggle" onchange="saveAgentSettings()" />
+          Allow browse
+        </label>
+      </div>
+      <div class="agents-grid" id="agents-grid">
+        <div class="empty-state"><p>Loading agents…</p></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ AGENT MODAL ════════════════════════════════════════════ -->
+<div class="modal-overlay" id="agent-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="agent-modal-title">Add Agent</h2>
+      <button class="modal-close" onclick="closeModal('agent-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ag-id" />
+      <div class="field-row">
+        <div class="field"><label>Contact Name *</label><input type="text" id="ag-name" placeholder="e.g. Mohammed Al-Hassan" /></div>
+        <div class="field"><label>Company Name *</label><input type="text" id="ag-company" placeholder="e.g. Al Hamra Agency" /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Country</label><input type="text" id="ag-country" placeholder="e.g. Saudi Arabia" /></div>
+        <div class="field"><label>Status</label><select id="ag-active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Username *</label><input type="text" id="ag-username" placeholder="e.g. alhamra" autocomplete="off" /></div>
+        <div class="field"><label>Password <span id="ag-pass-hint" style="font-weight:400;opacity:.65">(required for new)</span></label><input type="password" id="ag-password" placeholder="Leave blank to keep existing / enter to reset" autocomplete="new-password" /></div>
+      </div>
+      <div class="field">
+        <label>Agency Logo</label>
+        <div class="logo-upload-area" id="ag-logo-area" onclick="document.getElementById('ag-logo-file').click()">
+          <img id="ag-logo-preview" src="" style="display:none" alt="Logo" />
+          <p id="ag-logo-text">Click to upload logo (PNG / JPG)</p>
+        </div>
+        <input type="file" id="ag-logo-file" accept="image/*" style="display:none" onchange="previewAgentLogo(this)" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('agent-modal')">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-agent" onclick="saveAgent()">Save Agent</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PROFILE VIEW MODAL ════════════════════════════════════ -->
+<div class="modal-overlay" id="profile-view-modal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 id="pv-modal-title">Profile</h2>
+      <button class="modal-close" onclick="closeModal('profile-view-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="pv-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('profile-view-modal')">Close</button>
+      <button class="btn btn-teal-outline" id="pv-btn-builder" onclick="">Open Builder</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ASSIGN MODAL ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="assign-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="assign-modal-title">Assign Profiles</h2>
+      <button class="modal-close" onclick="closeModal('assign-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px;">Select which applicant profiles this agent can view and download.</p>
+      <input type="hidden" id="assign-agent-id" />
+      <div class="assign-list" id="assign-list">
+        <p style="color:var(--muted);font-size:.85rem;">No profiles found.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('assign-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAssignment()">Save Assignment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STATUS MODAL ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="status-modal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 id="status-modal-title">Update Status</h2>
+      <button class="modal-close" onclick="closeStatusModal()">✕</button>
+    </div>
+    <div class="modal-body" id="status-modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════
+let adminToken = '';
+let allProfiles = [];
+let allAgents   = [];
+let agentSettings = { allowAgentBrowse: false };
+let pendingLogoFile = null;
+
+const STEPS = [
+  { key:'medical',  label:'Medical'  },
+  { key:'enjaz',    label:'Enjaz'    },
+  { key:'bureau',   label:'Bureau'   },
+  { key:'wakalah',  label:'Wakalah'  },
+  { key:'embassy',  label:'Embassy'  },
+  { key:'payment',  label:'Payment'  },
+];
+const EXP_OPTIONS = [
+  'HM 21-49 Exp','HM 50-55 Exp','HM 51-55 Exp',
+  'HM - First Time','Couple','Driver','House Boy'
+];
+
+// ═══════════════════════════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════════════════════════
+function showToast(msg, ms = 2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Auth
+// ═══════════════════════════════════════════════════════════════
+async function doAdminLogin() {
+  const btn = document.getElementById('btn-admin-login');
+  const err = document.getElementById('login-error');
+  const pass = document.getElementById('admin-pass').value;
+  err.style.display = 'none';
+  if (!pass) { err.textContent = 'Please enter the admin password.'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const res  = await fetch('api/admin_agents.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'admin_login', password: pass }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Wrong password');
+    adminToken = data.adminToken;
+    sessionStorage.setItem('adminToken', adminToken);
+    showApp();
+  } catch(e) {
+    err.textContent = e.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+function doLogout() {
+  adminToken = ''; sessionStorage.removeItem('adminToken');
+  document.getElementById('admin-app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('admin-pass').value = '';
+  document.getElementById('btn-admin-login').disabled = false;
+  document.getElementById('btn-admin-login').textContent = 'Sign In';
+}
+
+async function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-app').style.display = 'flex';
+  await Promise.all([loadProfiles(), loadAgents()]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tabs
+// ═══════════════════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b  => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Builder navigation
+// ═══════════════════════════════════════════════════════════════
+function openBuilder(profileId) {
+  const url = profileId ? `index.html?id=${encodeURIComponent(profileId)}` : 'index.html?new=1';
+  window.location.href = url;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Load data
+// ═══════════════════════════════════════════════════════════════
+async function loadProfiles() {
+  try {
+    const res  = await fetch('api/list.php?admin_token=' + encodeURIComponent(adminToken));
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    allProfiles = (data.records || []).filter(r => r.id !== '__global__');
+    // Populate nationality filter
+    const nats = [...new Set(allProfiles.map(r => (r.fields||{})['f-nationality']).filter(Boolean))].sort();
+    const natSel = document.getElementById('ats-filter-nat');
+    if (natSel) {
+      natSel.innerHTML = '<option value="">All Nationalities</option>' +
+        nats.map(n => `<option>${escHtml(n)}</option>`).join('');
+    }
+    renderAts();
+  } catch(e) {
+    document.getElementById('ats-tbody').innerHTML = `<tr><td colspan="19" style="text-align:center;padding:32px;color:var(--muted)">Failed to load profiles.</td></tr>`;
+  }
+}
+
+async function loadAgents() {
+  try {
+    const res  = await fetch(`api/admin_agents.php?admin_token=${encodeURIComponent(adminToken)}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    allAgents = data.agents;
+    agentSettings = data.settings || { allowAgentBrowse: false };
+    const browseToggle = document.getElementById('agent-browse-toggle');
+    if (browseToggle) browseToggle.checked = !!agentSettings.allowAgentBrowse;
+    renderAgents();
+  } catch(e) {
+    document.getElementById('agents-grid').innerHTML = `<div class="empty-state"><p>Failed to load agents.</p></div>`;
+  }
+}
+
+async function saveAgentSettings() {
+  if (!adminToken) { showToast('Session expired — please log in again.'); doLogout(); return; }
+  const allowAgentBrowse = !!document.getElementById('agent-browse-toggle')?.checked;
+  try {
+    const res = await fetch('api/admin_agents.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save_settings', admin_token: adminToken, settings: { allowAgentBrowse } })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    agentSettings = data.settings || { allowAgentBrowse };
+    showToast(allowAgentBrowse ? 'Agents can browse and request profiles' : 'Agents limited to assigned profiles');
+  } catch(e) {
+    const browseToggle = document.getElementById('agent-browse-toggle');
+    if (browseToggle) browseToggle.checked = !!agentSettings.allowAgentBrowse;
+    showToast('Error: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Status helpers
+// ═══════════════════════════════════════════════════════════════
+function getStatus(tr) {
+  if (!tr) return 'pending';
+  if (tr.pipelineStatus === 'sent') return 'sent';
+  if ((tr.notes || '').toUpperCase().includes('CANCEL')) return 'cancelled';
+  const done = STEPS.filter(s => tr[s.key]).length;
+  if (done === 6 && tr.ticketDate) return 'ready';
+  if (done === 6) return 'complete';
+  if (done > 0)   return 'progress';
+  return 'pending';
+}
+const STATUS_LABEL = { ready:'Ready to Travel', complete:'Fully Processed', progress:'In Progress', pending:'Not Started', sent:'Sent', cancelled:'Cancelled' };
+
+// ═══════════════════════════════════════════════════════════════
+// ATS helpers
+// ═══════════════════════════════════════════════════════════════
+function dateFmt(d) {
+  if (!d) return '—';
+  const p = String(d).split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0].slice(2) : d;
+}
+function delayPill(musaned) {
+  if (!musaned) return `<span class="delay-pill none">—</span>`;
+  const d = Math.floor((Date.now() - new Date(musaned)) / 86400000);
+  if (d < 30)  return `<span class="delay-pill ok">${d}d</span>`;
+  if (d < 60)  return `<span class="delay-pill warn">${d}d</span>`;
+  return `<span class="delay-pill late">${d}d</span>`;
+}
+function atsTick(val) {
+  return val ? `<span class="step-tick-yes">✓</span>` : `<span class="step-tick-no">—</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Render ATS table
+// ═══════════════════════════════════════════════════════════════
+let activeCatFilter = '';
+function setCatFilter(btn, cat) {
+  activeCatFilter = cat;
+  document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderAts();
+}
+
+const CAT_BADGE = {
+  available_exp: '<span class="cat-badge exp">Experienced</span>',
+  available_new: '<span class="cat-badge new">Inexperienced</span>',
+  contracted:    '<span class="cat-badge contracted">Contracted</span>',
+  '':            '<span class="cat-badge unset">Unset</span>'
+};
+
+function renderAts() {
+  const tbody   = document.getElementById('ats-tbody');
+  const search  = (document.getElementById('ats-search')?.value || '').toLowerCase();
+  const fStatus = document.getElementById('ats-filter-status')?.value || '';
+  const fExp    = document.getElementById('ats-filter-exp')?.value || '';
+  const fNat    = document.getElementById('ats-filter-nat')?.value || '';
+
+  const filtered = allProfiles.filter(rec => {
+    const f  = rec.fields   || {};
+    const tr = rec.tracking || {};
+    if (search          && !(f['f-name'] || '').toLowerCase().includes(search)) return false;
+    if (fStatus         && getStatus(tr) !== fStatus) return false;
+    if (fExp            && (tr.experience || '') !== fExp) return false;
+    if (fNat            && (f['f-nationality'] || '') !== fNat) return false;
+    if (activeCatFilter && (tr.workerCategory || '') !== activeCatFilter) return false;
+    return true;
+  });
+
+  document.getElementById('ats-count').textContent = `${filtered.length} of ${allProfiles.length}`;
+
+  if (!allProfiles.length) {
+    tbody.innerHTML = `<tr><td colspan="19" style="text-align:center;padding:32px;color:var(--muted)">No profiles yet. Click <strong>+ New Profile</strong> to create one.</td></tr>`;
+    return;
+  }
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="19" style="text-align:center;padding:24px;color:var(--muted)">No profiles match the current filters.</td></tr>`;
+    return;
+  }
+
+  const BC = { ready:'ready', complete:'complete', progress:'progress', pending:'pending-s', sent:'sent', cancelled:'cancelled' };
+
+  tbody.innerHTML = filtered.map((rec, idx) => {
+    const f  = rec.fields   || {};
+    const im = rec.images   || {};
+    const tr = rec.tracking || {};
+    const name   = (f['f-name'] || '').trim() || '(Unnamed)';
+    const status = getStatus(tr);
+    const cat    = tr.workerCategory || '';
+    const thumb  = im.headshot
+      ? `<img src="uploads/${im.headshot}" style="width:34px;height:42px;object-fit:cover;border-radius:5px;vertical-align:middle;" onerror="this.outerHTML='<span>👤</span>'" alt="" />`
+      : `<span style="font-size:1.3rem">👤</span>`;
+
+    const rowClass = tr.pipelineStatus === 'sent' ? ' sent' : '';
+    const sentTag = tr.pipelineStatus === 'sent' ? '<span class="cat-badge contracted">Sent</span>' : '';
+    const dataRow = `<tr class="ats-row${rowClass}" id="ats-row-${rec.id}" onclick="openProfileView('${rec.id}')">
+      <td class="ats-muted">${idx + 1}</td>
+      <td>${thumb}</td>
+      <td class="ats-name">${escHtml(name)}${CAT_BADGE[cat] || CAT_BADGE['']}${sentTag}</td>
+      <td class="ats-muted">${escHtml(f['f-role'] || '—')}</td>
+      <td class="ats-muted">${escHtml(f['f-nationality'] || '—')}</td>
+      <td class="ats-muted">${escHtml(f['f-age'] || '—')}</td>
+      <td class="ats-muted">${escHtml(tr.experience || '—')}</td>
+      <td class="ats-muted">${dateFmt(tr.musaned)}</td>
+      <td>${delayPill(tr.musaned)}</td>
+      ${STEPS.map(s => `<td>${atsTick(tr[s.key])}</td>`).join('')}
+      <td class="ats-muted">${dateFmt(tr.ticketDate)}</td>
+      <td class="ats-muted">${dateFmt(tr.saudiAgentDate)}</td>
+      <td><span class="badge ${BC[status]}">${STATUS_LABEL[status]}</span></td>
+      <td class="ats-actions-cell" onclick="event.stopPropagation()">
+        <button class="btn-act btn-act-status" onclick="event.stopPropagation();toggleStatus('${rec.id}')">Status</button>
+        <button class="btn-act btn-act-builder" onclick="event.stopPropagation();openBuilder('${rec.id}')">Edit</button>
+        <button class="btn-act btn-act-delete" onclick="event.stopPropagation();deleteProfile('${rec.id}','${escHtml(name).replace(/'/g,"\\'")}')">Del</button>
+      </td>
+    </tr>`;
+
+    return dataRow;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEGACY render (kept for reference — not called)
+// ═══════════════════════════════════════════════════════════════
+function renderProfiles_UNUSED() {
+  const grid = document.getElementById('profiles-grid');
+  if (!allProfiles.length) {
+    grid.innerHTML = `<p>No profiles</p>`;
+    return;
+  }
+  grid.innerHTML = allProfiles.map(rec => {
+    const f  = rec.fields   || {};
+    const im = rec.images   || {};
+    const tr = rec.tracking || {};
+    const name   = (f['f-name'] || '').trim() || '(Unnamed)';
+    const role   = f['f-role'] || 'HOUSEMAID';
+    const status = getStatus(tr);
+    const done   = STEPS.filter(s => tr[s.key]).length;
+    const dots   = STEPS.map(s => `<span class="pipe-dot ${tr[s.key] ? 'done' : 'pending-dot'}" title="${s.label}"></span>`).join('');
+    const thumb  = im.headshot
+      ? `<img class="profile-thumb" src="uploads/${im.headshot}" alt="" onerror="this.outerHTML='<div class=profile-thumb-empty>👤</div>'" />`
+      : `<div class="profile-thumb-empty">👤</div>`;
+    const badgeClass = { ready:'ready', complete:'complete', progress:'progress', pending:'pending-s', sent:'sent', cancelled:'cancelled' }[status];
+
+    return `<div class="profile-card" id="card-${rec.id}">
+      <div class="profile-card-main" onclick="openProfileView('${rec.id}')" title="Click to view profile">
+        ${thumb}
+        <div class="profile-info">
+          <div class="profile-name">${escHtml(name)}</div>
+          <div class="profile-role">${escHtml(role)}${tr.experience ? ' · ' + escHtml(tr.experience) : ''}</div>
+          <div class="profile-pipeline">
+            ${dots}
+            <span class="pipe-label">${done}/6 steps &nbsp;·&nbsp; <span class="badge ${badgeClass}">${STATUS_LABEL[status]}</span></span>
+          </div>
+        </div>
+        <div class="profile-actions" onclick="event.stopPropagation()">
+          <button class="btn btn-teal-outline btn-sm" onclick="openBuilder('${rec.id}')">Open Builder</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleStatus('${rec.id}')">Status</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProfile('${rec.id}', '${escHtml(name)}')">Delete</button>
+        </div>
+      </div>
+      <div class="status-panel" id="status-panel-${rec.id}">
+        ${buildStatusPanel(rec)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildStatusPanel(rec) {
+  const id = rec.id;
+  const tr = rec.tracking || {};
+  const expOpts = EXP_OPTIONS.map(o => `<option value="${o}" ${tr.experience === o ? 'selected' : ''}>${o}</option>`).join('');
+
+  const stepChecks = STEPS.map(s => {
+    const dateVal  = tr[s.key + '_date'] || '';
+    const dateAttr = (tr[s.key] && dateVal) ? ` data-date="${escHtml(dateVal)}"` : '';
+    const dateSub  = (tr[s.key] && dateVal) ? `<span class="step-date-sub">${dateFmt(dateVal)}</span>` : '';
+    return `<div class="step-check ${tr[s.key] ? 'checked' : ''}" data-key="${s.key}"${dateAttr} onclick="toggleStepCheck(this)">
+      <span class="step-check-box">${tr[s.key] ? '✓' : ''}</span>
+      <span>${escHtml(s.label)}${dateSub}</span>
+    </div>`;
+  }).join('');
+
+  const confirmCls = tr.confirmed ? 'confirmed' : '';
+  const confirmTxt = tr.confirmed ? '✓ Candidate Confirmed' : '○ Mark as Confirmed';
+  const sentCls = tr.pipelineStatus === 'sent' ? 'sent' : '';
+  const sentTxt = tr.pipelineStatus === 'sent' ? '✓ Applicant Sent' : '○ Mark as Sent';
+
+  return `
+    <div class="status-panel-inner">
+      <div>
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px">Processing Steps</div>
+        <div class="steps-grid">${stepChecks}</div>
+        <div class="confirm-toggle ${confirmCls}" id="sp-confirm-${id}" onclick="toggleConfirm('${id}')">
+          <span>${confirmTxt}</span>
+        </div>
+        <div class="confirm-toggle ${sentCls}" id="sp-sent-${id}" onclick="toggleSent('${id}')">
+          <span>${sentTxt}</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px">Details</div>
+        <div class="field" style="margin-bottom:10px">
+          <label>Experience Type</label>
+          <select id="sp-exp-${id}"><option value="">— Select —</option>${expOpts}</select>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label>Worker Category</label>
+          <select id="sp-cat-${id}">
+            <option value="">— Unassigned —</option>
+            <option value="available_exp"  ${tr.workerCategory === 'available_exp'  ? 'selected' : ''}>✔ Available — Experienced</option>
+            <option value="available_new"  ${tr.workerCategory === 'available_new'  ? 'selected' : ''}>★ Available — Inexperienced</option>
+            <option value="contracted"     ${tr.workerCategory === 'contracted'     ? 'selected' : ''}>🔒 Contracted</option>
+          </select>
+        </div>
+        <div class="status-dates">
+          <div class="field" style="margin-bottom:0">
+            <label>Musaned Date</label>
+            <input type="date" id="sp-musaned-${id}" value="${tr.musaned || ''}" />
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Ticket Date</label>
+            <input type="date" id="sp-ticket-${id}" value="${tr.ticketDate || ''}" />
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Saudi Agent Visa Date</label>
+            <input type="date" id="sp-saudiAgent-${id}" value="${tr.saudiAgentDate || ''}" />
+          </div>
+        </div>
+        <div class="field" style="margin-top:10px;margin-bottom:0">
+          <label>Notes</label>
+          <textarea id="sp-notes-${id}" rows="2" placeholder="e.g. CANCELLED, or any remarks…">${escHtml(tr.notes || '')}</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="status-actions">
+      <button class="btn btn-ghost btn-sm" onclick="toggleStatus('${id}')">Close</button>
+      <button class="btn btn-primary btn-sm" onclick="saveStatus('${id}')">Save Status</button>
+    </div>`;
+}
+
+function toggleStepCheck(el) {
+  const isChecked = el.classList.toggle('checked');
+  const box = el.querySelector('.step-check-box');
+  if (box) box.textContent = isChecked ? '✓' : '';
+  const lbl = el.querySelector('span:not(.step-check-box)');
+  if (isChecked) {
+    if (!el.dataset.date) el.dataset.date = new Date().toISOString().slice(0, 10);
+    if (lbl) {
+      let sub = lbl.querySelector('.step-date-sub');
+      if (!sub) { sub = document.createElement('span'); sub.className = 'step-date-sub'; lbl.appendChild(sub); }
+      sub.textContent = dateFmt(el.dataset.date);
+    }
+  } else {
+    delete el.dataset.date;
+    if (lbl) { const sub = lbl.querySelector('.step-date-sub'); if (sub) sub.remove(); }
+  }
+}
+
+function toggleConfirm(id) {
+  const el = document.getElementById('sp-confirm-' + id);
+  if (!el) return;
+  const confirmed = el.classList.toggle('confirmed');
+  el.querySelector('span').textContent = confirmed ? '✓ Candidate Confirmed' : '○ Mark as Confirmed';
+}
+
+function toggleSent(id) {
+  const el = document.getElementById('sp-sent-' + id);
+  if (!el) return;
+  const sent = el.classList.toggle('sent');
+  el.querySelector('span').textContent = sent ? '✓ Applicant Sent' : '○ Mark as Sent';
+}
+
+function toggleStatus(id) {
+  const modal = document.getElementById('status-modal');
+  if (modal?.classList.contains('open')) {
+    closeStatusModal();
+    return;
+  }
+  openStatusModal(id);
+}
+
+function openStatusModal(id) {
+  const rec = allProfiles.find(r => r.id === id);
+  if (!rec) return;
+  const name = (rec.fields?.['f-name'] || '').trim() || '(Unnamed)';
+  document.getElementById('status-modal-title').textContent = `Update Status — ${name}`;
+  document.getElementById('status-modal-body').innerHTML =
+    `<div class="ats-expand-panel open" id="ats-panel-inner-${id}">${buildStatusPanel(rec)}</div>`;
+  const row = document.getElementById('ats-row-' + id);
+  if (row) row.classList.add('row-open');
+  openModal('status-modal');
+}
+
+function closeStatusModal() {
+  document.querySelectorAll('.ats-row.row-open').forEach(r => r.classList.remove('row-open'));
+  closeModal('status-modal');
+  document.getElementById('status-modal-body').innerHTML = '';
+}
+
+async function saveStatus(id) {
+  if (!adminToken) { showToast('Session expired — please log in again.'); doLogout(); return; }
+  const container = document.getElementById('ats-panel-inner-' + id);
+  if (!container) return;
+
+  const tracking = {};
+  STEPS.forEach(s => {
+    const el = container.querySelector(`.step-check[data-key="${s.key}"]`);
+    const checked = el ? el.classList.contains('checked') : false;
+    tracking[s.key] = checked;
+    tracking[s.key + '_date'] = (checked && el?.dataset?.date) ? el.dataset.date : null;
+  });
+  const confirmEl = document.getElementById('sp-confirm-' + id);
+  const sentEl = document.getElementById('sp-sent-' + id);
+  tracking.confirmed      = confirmEl ? confirmEl.classList.contains('confirmed') : false;
+  tracking.pipelineStatus = sentEl && sentEl.classList.contains('sent') ? 'sent' : '';
+  tracking.experience     = document.getElementById('sp-exp-' + id)?.value || '';
+  tracking.workerCategory = document.getElementById('sp-cat-' + id)?.value || '';
+  tracking.musaned        = document.getElementById('sp-musaned-' + id)?.value || null;
+  tracking.ticketDate     = document.getElementById('sp-ticket-' + id)?.value || null;
+  tracking.saudiAgentDate = document.getElementById('sp-saudiAgent-' + id)?.value || null;
+  tracking.notes          = document.getElementById('sp-notes-' + id)?.value || '';
+
+  try {
+    const res  = await fetch('api/admin_status.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_token: adminToken, id, tracking })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+
+    const idx = allProfiles.findIndex(r => r.id === id);
+    if (idx !== -1) allProfiles[idx].tracking = data.profile.tracking;
+
+    // Update data row tick cells + badge without closing the panel
+    const rec = idx !== -1 ? allProfiles[idx] : null;
+    if (rec) {
+      const tr2 = rec.tracking || {};
+      const dataRow = document.getElementById('ats-row-' + id);
+      if (dataRow) {
+        // Update step tick cells (cols 9-14, index 9-14)
+        STEPS.forEach((s, i) => { dataRow.cells[9 + i].innerHTML = atsTick(tr2[s.key]); });
+        // Update status badge (col 17 — Saudi Visa at 16 inserted)
+        const st2 = getStatus(tr2);
+        const BC2 = { ready:'ready', complete:'complete', progress:'progress', pending:'pending-s', sent:'sent', cancelled:'cancelled' };
+        dataRow.classList.toggle('sent', tr2.pipelineStatus === 'sent');
+        dataRow.cells[17].innerHTML = `<span class="badge ${BC2[st2]}">${STATUS_LABEL[st2]}</span>`;
+        // Update musaned / delay / ticket / saudi agent date
+        dataRow.cells[7].textContent  = dateFmt(tr2.musaned);
+        dataRow.cells[8].innerHTML    = delayPill(tr2.musaned);
+        dataRow.cells[15].textContent = dateFmt(tr2.ticketDate);
+        dataRow.cells[16].textContent = dateFmt(tr2.saudiAgentDate);
+      }
+      // Refresh status modal content if it is still open
+      const panel = document.getElementById('ats-panel-inner-' + id);
+      if (panel) { panel.innerHTML = buildStatusPanel(rec); panel.classList.add('open'); }
+    }
+    showToast('Status saved');
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+function openProfileView(id) {
+  const rec = allProfiles.find(r => r.id === id);
+  if (!rec) return;
+  const f  = rec.fields   || {};
+  const im = rec.images   || {};
+  const tr = rec.tracking || {};
+  const name   = (f['f-name'] || '').trim() || '(Unnamed)';
+  const status = getStatus(tr);
+  const badgeClass = { ready:'ready', complete:'complete', progress:'progress', pending:'pending-s', sent:'sent', cancelled:'cancelled' }[status];
+
+  const headshot = im.headshot
+    ? `<img src="uploads/${escHtml(im.headshot)}" alt="" />`
+    : '👤';
+
+  const row = (lbl, val) => val ? `<div class="pv-row"><span class="pv-lbl">${lbl}</span><span class="pv-val">${escHtml(String(val))}</span></div>` : '';
+
+  const steps = STEPS.map(s =>
+    `<span class="pv-step ${tr[s.key] ? 'done' : 'pd'}">${tr[s.key] ? '✓' : '○'} ${s.label}</span>`
+  ).join('');
+
+  const contactFields = [
+    ['Phone',     f['f-phone']],
+    ['WhatsApp',  f['f-whatsapp']],
+    ['Email',     f['f-email']],
+    ['Emergency', f['f-emergency']],
+    ['Address',   f['f-address']],
+  ].filter(([,v]) => v);
+
+  const contactSection = contactFields.length ? `
+    <div class="pv-section pv-contact">
+      <div class="pv-section-title">Contact Details (Internal)</div>
+      ${contactFields.map(([l,v]) => row(l, v)).join('')}
+    </div>` : '';
+
+  document.getElementById('pv-modal-title').textContent = name;
+  document.getElementById('pv-btn-builder').onclick = () => { closeModal('profile-view-modal'); openBuilder(id); };
+  document.getElementById('pv-modal-body').innerHTML = `
+    <div class="pv-top">
+      <div class="pv-photos">
+        <div class="pv-headshot">${headshot}</div>
+      </div>
+      <div class="pv-info">
+        <div class="pv-name">${escHtml(name)}</div>
+        <div class="pv-role">${escHtml(f['f-role'] || '')}${tr.experience ? ' · ' + escHtml(tr.experience) : ''}</div>
+        <span class="badge ${badgeClass}">${STATUS_LABEL[status]}</span>
+      </div>
+    </div>
+    <div class="pv-section">
+      <div class="pv-section-title">Processing Steps</div>
+      <div class="pv-steps">${steps}</div>
+      ${tr.workerCategory ? `<div class="pv-row" style="margin-top:6px"><span class="pv-lbl">Category</span><span class="pv-val">${CAT_BADGE[tr.workerCategory] || escHtml(tr.workerCategory)}</span></div>` : ''}
+      ${tr.musaned ? `<div class="pv-row" style="margin-top:6px"><span class="pv-lbl">Musaned Date</span><span class="pv-val">${escHtml(tr.musaned)}</span></div>` : ''}
+      ${tr.ticketDate ? `<div class="pv-row"><span class="pv-lbl">Ticket Date</span><span class="pv-val">${escHtml(tr.ticketDate)}</span></div>` : ''}
+      ${tr.saudiAgentDate ? `<div class="pv-row"><span class="pv-lbl">Saudi Agent Visa Date</span><span class="pv-val">${escHtml(tr.saudiAgentDate)}</span></div>` : ''}
+      ${tr.notes ? `<div class="pv-row"><span class="pv-lbl">Notes</span><span class="pv-val">${escHtml(tr.notes)}</span></div>` : ''}
+    </div>
+    <div class="pv-section">
+      <div class="pv-section-title">Personal Information</div>
+      <div class="pv-grid">
+        ${row('Nationality', f['f-nationality'])}
+        ${row('Religion',    f['f-religion'])}
+        ${row('Date of Birth', f['f-dob'])}
+        ${row('Age',         f['f-age'])}
+        ${row('Height',      f['f-height'])}
+        ${row('Weight',      f['f-weight'])}
+        ${row('Marital',     f['f-marital'])}
+        ${row('Children',    f['f-children'])}
+      </div>
+    </div>
+    <div class="pv-section">
+      <div class="pv-section-title">Passport</div>
+      <div class="pv-grid">
+        ${row('Passport No.', f['f-passport'])}
+        ${row('Place of Issue', f['f-pissue'])}
+        ${row('Date of Issue',  f['f-doi'])}
+        ${row('Date of Expiry', f['f-doe'])}
+      </div>
+    </div>
+    ${contactSection}
+  `;
+  openModal('profile-view-modal');
+}
+
+async function deleteProfile(id, name) {
+  if (!confirm(`Delete profile "${name}"? This cannot be undone.`)) return;
+  try {
+    const res  = await fetch('api/delete.php?id=' + encodeURIComponent(id) + '&admin_token=' + encodeURIComponent(adminToken), { method:'POST' });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    allProfiles = allProfiles.filter(r => r.id !== id);
+    renderProfiles();
+    showToast('Profile deleted');
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Render agents
+// ═══════════════════════════════════════════════════════════════
+function renderAgents() {
+  const grid = document.getElementById('agents-grid');
+  if (!allAgents.length) {
+    grid.innerHTML = `<div class="empty-state"><p>No agents yet. Click <strong>+ Add Agent</strong> to create one.</p></div>`;
+    return;
+  }
+  grid.innerHTML = allAgents.map(ag => {
+    const count    = (ag.applicantIds || []).length;
+    const pending  = (ag.pendingIds   || []).length;
+    const initials = (ag.company || ag.name || 'A').charAt(0).toUpperCase();
+    const logoHtml = ag.logo ? `<img src="uploads/${ag.logo}" alt="logo" />` : initials;
+    const pendingBadge = pending > 0
+      ? `<span class="pending-badge">⏳ ${pending} request${pending !== 1 ? 's' : ''} pending</span>`
+      : '';
+    return `<div class="agent-card">
+      <div class="agent-card-header">
+        <div class="agent-avatar">${logoHtml}</div>
+        <div class="agent-card-title">
+          <h3>${escHtml(ag.company)}</h3>
+          <p>${escHtml(ag.name)} · ${escHtml(ag.country || '—')}</p>
+        </div>
+        <span class="agent-dot ${ag.active ? '' : 'off'}" title="${ag.active ? 'Active' : 'Inactive'}"></span>
+      </div>
+      <div class="agent-meta">
+        <span>@${ag.username}</span>
+        <span>${count} profile${count !== 1 ? 's' : ''} assigned</span>
+        ${pendingBadge}
+      </div>
+      <div class="agent-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openAgentModal('${ag.id}')">Edit</button>
+        <button class="btn btn-teal-outline btn-sm" onclick="openAssignModal('${ag.id}')">Assign Profiles</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAgent('${ag.id}', '${escHtml(ag.company)}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Agent modal
+// ═══════════════════════════════════════════════════════════════
+function openAgentModal(id) {
+  const ag = id ? allAgents.find(a => a.id === id) : null;
+  document.getElementById('agent-modal-title').textContent = ag ? 'Edit Agent' : 'Add Agent';
+  document.getElementById('ag-id').value        = ag?.id || '';
+  document.getElementById('ag-name').value      = ag?.name || '';
+  document.getElementById('ag-company').value   = ag?.company || '';
+  document.getElementById('ag-country').value   = ag?.country || '';
+  document.getElementById('ag-username').value  = ag?.username || '';
+  document.getElementById('ag-password').value  = '';
+  document.getElementById('ag-active').value    = (ag?.active !== false) ? '1' : '0';
+  document.getElementById('ag-pass-hint').textContent = ag ? '(blank keeps existing; enter new to reset)' : '(required)';
+  pendingLogoFile = null;
+  const prev = document.getElementById('ag-logo-preview');
+  const text = document.getElementById('ag-logo-text');
+  if (ag?.logo) { prev.src = `uploads/${ag.logo}`; prev.style.display = 'block'; text.textContent = 'Click to change'; }
+  else { prev.style.display = 'none'; text.textContent = 'Click to upload logo (PNG / JPG)'; }
+  openModal('agent-modal');
+}
+
+function previewAgentLogo(input) {
+  const file = input.files[0]; if (!file) return;
+  pendingLogoFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const p = document.getElementById('ag-logo-preview');
+    p.src = e.target.result; p.style.display = 'block';
+    document.getElementById('ag-logo-text').textContent = 'Click to change';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveAgent() {
+  const btn = document.getElementById('btn-save-agent');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const id = document.getElementById('ag-id').value;
+    const ag = {
+      id:      id || undefined,
+      name:    document.getElementById('ag-name').value.trim(),
+      company: document.getElementById('ag-company').value.trim(),
+      country: document.getElementById('ag-country').value.trim(),
+      username:document.getElementById('ag-username').value.trim().toLowerCase(),
+      active:  document.getElementById('ag-active').value === '1',
+    };
+    const pass = document.getElementById('ag-password').value;
+    if (pass) ag.password = pass;
+    if (!ag.name || !ag.company || !ag.username) { showToast('Please fill in required fields'); btn.disabled = false; btn.textContent = 'Save Agent'; return; }
+    if (!id && !pass) { showToast('Password required for new agents'); btn.disabled = false; btn.textContent = 'Save Agent'; return; }
+    if (!id) ag.id = 'agent_' + ag.username.replace(/[^a-z0-9]/gi,'').toLowerCase();
+
+    const res  = await fetch('api/admin_agents.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'save_agent', admin_token: adminToken, agent: ag }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+
+    if (pendingLogoFile) {
+      const fd = new FormData();
+      fd.append('logo', pendingLogoFile);
+      fd.append('admin_token', adminToken);
+      fd.append('agent_id', data.agent.id);
+      await fetch('api/agent_logo.php', { method:'POST', body: fd });
+    }
+
+    closeModal('agent-modal');
+    await loadAgents();
+    showToast('Agent saved');
+  } catch(e) { showToast('Error: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Save Agent'; }
+}
+
+async function deleteAgent(id, name) {
+  if (!confirm(`Delete agent "${name}"? This cannot be undone.`)) return;
+  try {
+    const res  = await fetch('api/admin_agents.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'delete_agent', admin_token: adminToken, id }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    await loadAgents(); showToast('Agent deleted');
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Assign profiles modal
+// ═══════════════════════════════════════════════════════════════
+function openAssignModal(agentId) {
+  const ag = allAgents.find(a => a.id === agentId);
+  if (!ag) return;
+  document.getElementById('assign-modal-title').textContent = `Assign Profiles — ${ag.company}`;
+  document.getElementById('assign-agent-id').value = agentId;
+  const assigned = ag.applicantIds || [];
+  const pending  = ag.pendingIds   || [];
+
+  const list = document.getElementById('assign-list');
+  if (!allProfiles.length) {
+    list.innerHTML = `<p style="color:var(--muted);font-size:.82rem;">No profiles yet. Create profiles first.</p>`;
+  } else {
+    // Sort: pending-unassigned first, then assigned, then rest
+    const sorted = [...allProfiles].sort((a, b) => {
+      const aP = pending.includes(a.id) && !assigned.includes(a.id);
+      const bP = pending.includes(b.id) && !assigned.includes(b.id);
+      return bP - aP;
+    });
+    list.innerHTML = sorted.map(rec => {
+      const f          = rec.fields || {};
+      const im         = rec.images || {};
+      const name       = (f['f-name'] || '').trim() || '(Unnamed)';
+      const role       = f['f-role'] || '';
+      const chk        = assigned.includes(rec.id);
+      const isRequested = pending.includes(rec.id) && !chk;
+      const img = im.headshot
+        ? `<img src="uploads/${im.headshot}" alt="" onerror="this.style.display='none'" />`
+        : `<div style="width:36px;height:42px;border-radius:5px;background:var(--teal-light);display:flex;align-items:center;justify-content:center;color:var(--teal);font-size:.9rem;">👤</div>`;
+      const reqTag = isRequested ? `<span class="req-tag">Requested</span>` : '';
+      return `<div class="assign-item ${chk ? 'checked' : ''} ${isRequested ? 'pending-req' : ''}" onclick="toggleAssign(this)">
+        ${img}
+        <div class="assign-item-info"><strong>${escHtml(name)}</strong><span>${escHtml(role)}</span></div>
+        ${reqTag}
+        <input type="checkbox" value="${rec.id}" ${chk ? 'checked' : ''} />
+      </div>`;
+    }).join('');
+  }
+  openModal('assign-modal');
+}
+
+function toggleAssign(label) {
+  const cb = label.querySelector('input');
+  cb.checked = !cb.checked;
+  label.classList.toggle('checked', cb.checked);
+}
+
+async function saveAssignment() {
+  const agentId     = document.getElementById('assign-agent-id').value;
+  const applicantIds = [...document.querySelectorAll('#assign-list input:checked')].map(cb => cb.value);
+  try {
+    const res  = await fetch('api/admin_agents.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'assign_applicants', admin_token: adminToken, id: agentId, applicantIds }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    closeModal('assign-modal');
+    await loadAgents();
+    showToast('Assignment saved');
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Modal helpers
+// ═══════════════════════════════════════════════════════════════
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.addEventListener('click', e => {
+  document.querySelectorAll('.modal-overlay.open').forEach(m => {
+    if (e.target !== m) return;
+    if (m.id === 'status-modal') closeStatusModal();
+    else m.classList.remove('open');
+  });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => {
+    if (m.id === 'status-modal') closeStatusModal();
+    else m.classList.remove('open');
+  });
+  if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doAdminLogin();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Boot
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  const saved = sessionStorage.getItem('adminToken');
+  if (saved) { adminToken = saved; showApp(); }
+});
+</script>
+</body>
+</html>

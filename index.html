@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Candidate Profile PDF Builder</title>
+  <meta name="description" content="Fill, save, and export candidate profiles as PDF matching the agency template." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</head>
+
+<body>
+
+  <!-- ══ LOGIN (Phase 0 stopgap — full session auth lands in the Next.js rebuild) ══ -->
+  <style>
+    #builder-login-screen{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1A2B35 0%,#2B7A8C 100%);padding:24px;}
+    #builder-login-screen .card{background:#fff;border-radius:16px;padding:48px 40px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.2);}
+    #builder-login-screen .logo-wrap{text-align:center;margin-bottom:28px;}
+    #builder-login-screen .logo-wrap img{height:48px;object-fit:contain;}
+    #builder-login-screen .badge{display:inline-block;margin-top:10px;background:#FEF9E7;color:#9A7D0A;font-size:.68rem;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.08em;}
+    #builder-login-screen .title{font-size:1.1rem;font-weight:700;text-align:center;margin-bottom:22px;}
+    #builder-login-screen label{display:block;font-size:.75rem;font-weight:700;color:#767676;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
+    #builder-login-screen input{width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:.9rem;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px;}
+    #builder-login-screen input:focus{border-color:#355B66;}
+    #builder-login-screen button{width:100%;padding:12px;border:none;border-radius:7px;font-size:.95rem;font-weight:700;cursor:pointer;background:#355B66;color:#fff;font-family:inherit;}
+    #builder-login-screen button:disabled{opacity:.5;cursor:not-allowed;}
+    #builder-login-screen button:hover:not(:disabled){background:#274650;}
+    #builder-login-error{color:#c0392b;font-size:.82rem;text-align:center;margin-top:10px;display:none;}
+  </style>
+  <div id="builder-login-screen">
+    <div class="card">
+      <div class="logo-wrap">
+        <img src="logo.png" alt="Topway" onerror="this.style.display='none'" />
+        <div><span class="badge">Profile Builder</span></div>
+      </div>
+      <div class="title">Staff Sign In</div>
+      <label for="builder-login-pass">Admin Password</label>
+      <input type="password" id="builder-login-pass" placeholder="Enter admin password" autocomplete="current-password" />
+      <button id="builder-login-btn" onclick="builderLogin()">Sign In</button>
+      <div id="builder-login-error"></div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ══════════════════════════════════════
+     HOME SCREEN
+══════════════════════════════════════ -->
+  <div id="home-screen">
+    <div class="home-logo-mark">
+      <img src="logo.png" alt="Topway Logo" onerror="this.style.display='none'" />
+    </div>
+    <h1 class="home-title">Candidate Profile Builder</h1>
+    <p class="home-subtitle">Create applicant profiles</p>
+
+    <div class="home-buttons">
+      <button class="btn btn-primary" id="btn-create-new" onclick="startNew()">＋ Create Applicant Profile</button>
+    </div>
+
+    <div class="saved-list" id="saved-list">
+      <h3>Saved Profiles</h3>
+      <div id="saved-items-container">
+        <p style="color:var(--muted);font-size:.85rem;">No saved profiles yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+     FORM SCREEN
+══════════════════════════════════════ -->
+  <div id="form-screen">
+
+    <div class="form-topbar">
+      <button class="btn btn-sm" id="btn-home"
+        style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);" onclick="goHome()">←
+        Admin</button>
+      <h2 id="form-title">New Profile</h2>
+      <div class="form-topbar-actions">
+        <button class="btn btn-sm" id="btn-save" style="background:#678FA1;color:#fff;" onclick="saveRecord()" title="Save profile">💾 <span class="btn-label-text">Save</span></button>
+        <button class="btn btn-sm" id="btn-preview"
+          style="background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);"
+          onclick="openPreview()" title="Preview PDF">👁 <span class="btn-label-text">Preview</span></button>
+        <button class="btn btn-sm btn-green" id="btn-export-pdf" onclick="exportPDF()" title="Export PDF">⬇ <span class="btn-label-text">PDF</span></button>
+      </div>
+    </div>
+
+    <div class="form-body">
+
+      <!-- LOGOS -->
+      <div class="card">
+        <div class="card-header">Header Logo</div>
+        <div class="card-body">
+          <div class="logo-section">
+            <div class="logo-slot">
+              <label class="slot-label">Foreign Agency Logo</label>
+              <div class="logo-preview" id="left-logo-preview"
+                onclick="document.getElementById('left-logo-input').click()"
+                title="Click to upload logo">
+                <span class="empty-label">Click to upload</span>
+              </div>
+              <div class="logo-actions">
+                <button class="btn btn-danger btn-sm" onclick="removeLeftLogo()">Remove</button>
+              </div>
+              <input type="file" id="left-logo-input" accept="image/png,image/jpeg" class="hidden"
+                onchange="uploadLeftLogo(event)" />
+              <p class="logo-note">Shared across all applicants · click or drag to upload</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PHOTOS -->
+      <div class="card">
+        <div class="card-header">Photos</div>
+        <div class="card-body">
+          <div class="photo-section">
+            <div class="photo-slot">
+              <label class="slot-label">Headshot <span class="slot-label-note">(auto from full photo)</span></label>
+              <div class="photo-preview" id="headshot-preview"
+                onclick="document.getElementById('headshot-input').click()"
+                title="Click or drag to upload headshot">
+                <span class="empty-label">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span>Headshot</span>
+                  <small>click or drag · PNG/JPG</small>
+                </span>
+              </div>
+              <div class="logo-actions mt-8" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+                <button class="btn btn-danger btn-sm" onclick="removePhoto('headshot')">Remove</button>
+                <button class="btn btn-outline btn-sm hidden" id="headshot-adjust-btn" onclick="openCropModal()">✂ Adjust</button>
+              </div>
+              <input type="file" id="headshot-input" accept="image/png,image/jpeg" class="hidden"
+                onchange="uploadPhoto(event,'headshot')" />
+            </div>
+            <div class="photo-slot full">
+              <label class="slot-label">Full Body Photo <span class="slot-label-note">(headshot auto-extracted)</span></label>
+              <div class="photo-preview" id="fullphoto-preview"
+                onclick="document.getElementById('fullphoto-input').click()"
+                title="Click or drag to upload full photo">
+                <span class="empty-label">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span>Full Body Photo</span>
+                  <small>Headshot auto-extracted · PNG/JPG</small>
+                </span>
+              </div>
+              <div class="logo-actions mt-8">
+                <button class="btn btn-danger btn-sm" onclick="removePhoto('fullphoto')">Remove</button>
+              </div>
+              <input type="file" id="fullphoto-input" accept="image/png,image/jpeg" class="hidden"
+                onchange="uploadPhoto(event,'fullphoto')" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- A: TITLE / ROLE -->
+      <div class="card">
+        <div class="card-header">A — Title / Role</div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field-group">
+              <label>Role / Position</label>
+              <input type="text" id="f-role" value="HOUSEMAID" placeholder="Select or type role" list="role-options" />
+            </div>
+            <div class="field-group">
+              <label>Contract Period</label>
+              <select id="f-contract">
+                <option>2 YEARS</option>
+                <option>1 YEAR</option>
+                <option>3 YEARS</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- F: REFERENCE -->
+      <div class="card">
+        <div class="card-header">F — Reference Block</div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field-group">
+              <label>Ref No.</label>
+              <input type="text" id="f-refno" placeholder="e.g. A 02" />
+            </div>
+            <div class="field-group">
+              <label>Candidate Name</label>
+              <input type="text" id="f-name" placeholder="e.g. M.I RILMIYA" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- B: SKILLS -->
+      <div class="card">
+        <div class="card-header">B — Skills</div>
+        <div class="card-body">
+          <div class="checkbox-grid">
+            <label class="checkbox-item"><input type="checkbox" id="sk-cleaning" /> Cleaning</label>
+            <label class="checkbox-item"><input type="checkbox" id="sk-washing" /> Washing</label>
+            <label class="checkbox-item"><input type="checkbox" id="sk-babysitting" /> Baby Sitting</label>
+            <label class="checkbox-item"><input type="checkbox" id="sk-cooking" /> Arabic Cooking</label>
+            <label class="checkbox-item"><input type="checkbox" id="sk-driving" /> Driving</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- C: PERSONAL INFO -->
+      <div class="card">
+        <div class="card-header">C — Personal Information</div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field-group">
+              <label>Nationality</label>
+              <select id="f-nationality">
+                <option value="">— Select —</option>
+                <option>Sri Lankan</option>
+                <option>Filipino</option>
+                <option>Indonesian</option>
+                <option>Indian</option>
+                <option>Kenyan</option>
+                <option>Ugandan</option>
+                <option>Ghanaian</option>
+                <option>Ethiopian</option>
+                <option>Bangladeshi</option>
+                <option>Nepali</option>
+                <option>Pakistani</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label>Religion</label>
+              <select id="f-religion">
+                <option value="">— Select —</option>
+                <option>Islam</option>
+                <option>Christianity</option>
+                <option>Hinduism</option>
+                <option>Buddhism</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label>Date of Birth</label>
+              <input type="date" id="f-dob" />
+            </div>
+            <div class="field-group">
+              <label>Age</label>
+              <input type="number" id="f-age" placeholder="e.g. 28" min="16" max="65" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label>Height</label>
+              <input type="text" id="f-height" placeholder="e.g. 155 CM" list="height-options" />
+            </div>
+            <div class="field-group">
+              <label>Weight</label>
+              <input type="text" id="f-weight" placeholder="e.g. 55 KG" list="weight-options" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label>Marital Status</label>
+              <select id="f-marital">
+                <option value="">— Select —</option>
+                <option>Single</option>
+                <option>Married</option>
+                <option>Divorced</option>
+                <option>Widowed</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label>Children (No.)</label>
+              <input type="number" id="f-children" placeholder="0" min="0" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- D: PASSPORT -->
+      <div class="card">
+        <div class="card-header">D — Passport Details</div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field-group">
+              <label>Passport No.</label>
+              <input type="text" id="f-passport" placeholder="e.g. N1234567" />
+            </div>
+            <div class="field-group">
+              <label>Place of Issue</label>
+              <input type="text" id="f-pissue" placeholder="Select or type place" list="issue-place-options" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label>Date of Issue</label>
+              <input type="date" id="f-doi" />
+            </div>
+            <div class="field-group">
+              <label>Date of Expiry</label>
+              <input type="date" id="f-doe" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- E: EDUCATION -->
+      <div class="card">
+        <div class="card-header">E — Educational Qualification</div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field-group">
+              <label>Qualification</label>
+              <select id="f-edu">
+                <option value="">— Select —</option>
+                <option>Primary School</option>
+                <option>Grade 8</option>
+                <option>Grade 10</option>
+                <option>O/L</option>
+                <option>A/L</option>
+                <option>Diploma</option>
+                <option>University</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label>Year</label>
+              <input type="number" id="f-eduyear" placeholder="e.g. 2010" min="1960" max="2100" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- G: EMPLOYMENT RECORD -->
+      <div class="card">
+        <div class="card-header">G — Employment Record</div>
+        <div class="card-body">
+          <table class="emp-table" id="emp-table">
+            <thead>
+              <tr>
+                <th>Position</th>
+                <th>Country</th>
+                <th>Period</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="emp-tbody"></tbody>
+          </table>
+          <button class="btn btn-outline btn-sm btn-add-row" onclick="addEmpRow()">＋ Add Row</button>
+        </div>
+      </div>
+
+      <!-- H: LANGUAGE -->
+      <div class="card">
+        <div class="card-header">H — Language Skills</div>
+        <div class="card-body">
+          <div class="lang-grid">
+            <div></div>
+            <div class="lang-header">Speaking</div>
+            <div class="lang-header">Writing</div>
+
+            <div class="lang-name">English</div>
+            <label class="checkbox-item"><input type="checkbox" id="lang-en-speak" /> Speaking</label>
+            <label class="checkbox-item"><input type="checkbox" id="lang-en-write" /> Writing</label>
+
+            <div class="lang-name">Arabic</div>
+            <label class="checkbox-item"><input type="checkbox" id="lang-ar-speak" /> Speaking</label>
+            <label class="checkbox-item"><input type="checkbox" id="lang-ar-write" /> Writing</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- H2: CONTACT DETAILS (admin-only, not shown on agent PDF) -->
+      <div class="card">
+        <div class="card-header">H2 — Applicant Contact Details <span style="font-size:.72rem;font-weight:400;opacity:.65">(internal only — not visible to agents)</span></div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field-group">
+              <label>Phone Number</label>
+              <input type="text" id="f-phone" placeholder="e.g. +94 77 123 4567" />
+            </div>
+            <div class="field-group">
+              <label>WhatsApp</label>
+              <input type="text" id="f-whatsapp" placeholder="e.g. +94 77 123 4567" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label>Email</label>
+              <input type="email" id="f-email" placeholder="e.g. applicant@email.com" />
+            </div>
+            <div class="field-group">
+              <label>Emergency Contact</label>
+              <input type="text" id="f-emergency" placeholder="e.g. +94 71 987 6543" />
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Home Address</label>
+            <input type="text" id="f-address" placeholder="e.g. No. 12, Main Street, Colombo" />
+          </div>
+        </div>
+      </div>
+
+      <!-- I: FOOTER -->
+      <div class="card">
+        <div class="card-header">I — Footer Contact Lines</div>
+        <div class="card-body footer-lines">
+          <div class="field-group">
+            <label>Line 1</label>
+            <input type="text" id="footer-1"
+              placeholder="e.g. For more information please call us on +971 XX XXX XXXX" />
+          </div>
+          <div class="field-group">
+            <label>Line 2 (optional)</label>
+            <input type="text" id="footer-2" placeholder="e.g. Email: agency@example.com" />
+          </div>
+          <div class="field-group">
+            <label>Line 3 (optional)</label>
+            <input type="text" id="footer-3" placeholder="e.g. www.agencywebsite.com" />
+          </div>
+        </div>
+      </div>
+
+      <!-- J: IDENTITY DOCUMENTS -->
+      <div class="card">
+        <div class="card-header">J — Identity Documents <span style="font-size:.72rem;font-weight:400;opacity:.7">(Admin only — visible to agent only when candidate is confirmed)</span></div>
+        <div class="card-body">
+          <div class="photo-section" style="flex-wrap:wrap;gap:16px;">
+            <div class="photo-slot" style="flex:1;min-width:200px;">
+              <label class="slot-label">Passport Photo / Scan</label>
+              <div class="photo-preview" id="doc-passport-preview"
+                onclick="document.getElementById('doc-passport-input').click()"
+                title="Click to upload passport photo or PDF">
+                <span class="empty-label">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span>Passport</span>
+                </span>
+              </div>
+              <div class="logo-actions mt-8" style="display:flex;gap:6px;justify-content:center;">
+                <button class="btn btn-danger btn-sm" onclick="removeDoc('doc-passport')">Remove</button>
+              </div>
+              <input type="file" id="doc-passport-input" accept="image/png,image/jpeg,application/pdf" class="hidden"
+                onchange="uploadDoc(event,'doc-passport')" />
+            </div>
+            <div class="photo-slot" style="flex:1;min-width:200px;">
+              <label class="slot-label">Alteration &amp; Observation Page</label>
+              <div class="photo-preview" id="doc-alteration-preview"
+                onclick="document.getElementById('doc-alteration-input').click()"
+                title="Click to upload alteration page photo or PDF">
+                <span class="empty-label">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span>Alteration Page</span>
+                </span>
+              </div>
+              <div class="logo-actions mt-8" style="display:flex;gap:6px;justify-content:center;">
+                <button class="btn btn-danger btn-sm" onclick="removeDoc('doc-alteration')">Remove</button>
+              </div>
+              <input type="file" id="doc-alteration-input" accept="image/png,image/jpeg,application/pdf" class="hidden"
+                onchange="uploadDoc(event,'doc-alteration')" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom action bar -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;padding:8px 0 16px;">
+        <button class="btn btn-accent" onclick="saveRecord()">💾 Save Record</button>
+        <button class="btn btn-primary" onclick="openPreview()">👁 Preview PDF</button>
+        <button class="btn btn-green" onclick="exportPDF()">⬇ Export PDF</button>
+      </div>
+
+    </div><!-- /form-body -->
+  </div><!-- /form-screen -->
+
+  <!-- ══════════════════════════════════════
+     PREVIEW MODAL
+══════════════════════════════════════ -->
+  <div class="modal-overlay" id="preview-modal">
+    <div class="modal-box" style="max-width:830px;">
+      <h3>
+        PDF Preview
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-green btn-sm" onclick="exportPDF()">⬇ Export PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="closePreview()">✕ Close</button>
+        </div>
+      </h3>
+      <div id="preview-wrap"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+     PDF LAYOUT — A4 portrait: 794 × 1123 px
+     Captured by html2canvas, never shown inline.
+══════════════════════════════════════ -->
+  <div id="pdf-layout-container">
+    <div id="pdf-layout">
+
+      <!-- HEADER — full width, edge to edge -->
+      <div class="pdf-topbar">
+        <div class="pdf-logo-slot" id="pdf-left-logo-wrap"></div>
+        <div class="pdf-header-center">
+          <div class="pdf-header-title" id="pdf-header-title">CANDIDATE PROFILE</div>
+          <div class="pdf-header-sub" id="pdf-header-sub">Applicant Information Sheet</div>
+        </div>
+        <div class="pdf-logo-slot right">
+          <img src="logo.png" alt="Agency" class="pdf-logo" onerror="this.style.display='none'" />
+        </div>
+      </div>
+
+      <!-- BODY — padded content area -->
+      <div class="pdf-body">
+
+        <!-- TOP GRID: Skills | Role/Contract | Headshot -->
+        <div class="pdf-topgrid">
+          <div class="pdf-box">
+            <div class="pdf-box-title">Skills</div>
+            <table class="pdf-skill-table" id="pdf-skills-table"></table>
+          </div>
+
+          <div class="pdf-box pdf-role-box">
+            <div class="pdf-role-title" id="pdf-role-title">HOUSEMAID</div>
+            <div class="pdf-contract" id="pdf-contract-bar">Contract: 2 Years</div>
+          </div>
+
+          <div class="pdf-box pdf-headshot-box">
+            <div class="pdf-headshot" id="pdf-headshot-wrap">
+              <span class="pdf-placeholder">Headshot</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- MAIN GRID: Info tables | Full photo -->
+        <div class="pdf-maingrid">
+          <div class="pdf-leftwide">
+            <table class="pdf-info-table" id="pdf-personal-table"></table>
+            <table class="pdf-info-table" id="pdf-passport-table"></table>
+            <table class="pdf-info-table" id="pdf-edu-table"></table>
+          </div>
+
+          <div class="pdf-rightphoto">
+            <div class="pdf-fullphoto" id="pdf-fullphoto-wrap">
+              <span class="pdf-placeholder">Full Photo</span>
+            </div>
+            <div class="pdf-ref-under" id="pdf-ref-under"></div>
+          </div>
+        </div>
+
+        <!-- EMPLOYMENT + LANGUAGE (full width) -->
+        <div class="pdf-emp-block">
+          <div class="pdf-emp-title">Employment Record &amp; Language Skills</div>
+          <table class="pdf-lang-table">
+            <thead>
+              <tr>
+                <th>Language</th>
+                <th>Speaking</th>
+                <th>Writing</th>
+              </tr>
+            </thead>
+            <tbody id="pdf-lang-tbody"></tbody>
+          </table>
+          <table class="pdf-emp-table" id="pdf-emp-table-out">
+            <thead>
+              <tr>
+                <th>Position</th>
+                <th>Country</th>
+                <th>Period</th>
+              </tr>
+            </thead>
+            <tbody id="pdf-emp-tbody"></tbody>
+          </table>
+        </div>
+
+      </div><!-- /pdf-body -->
+
+      <!-- FOOTER — full width, edge to edge -->
+      <div class="pdf-footer" id="pdf-footer"></div>
+
+    </div><!-- /pdf-layout -->
+  </div><!-- /pdf-layout-container -->
+
+  <!-- CROP ADJUSTMENT MODAL -->
+  <div id="crop-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width:540px">
+      <h3>Adjust Headshot Crop
+        <button class="btn btn-outline btn-sm" onclick="closeCropModal()">✕</button>
+      </h3>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Drag the photo inside the frame and use zoom to position the face exactly where you want it.</p>
+      <p id="crop-status" style="font-size:.82rem;color:var(--muted);margin:-4px 0 12px">Loading photo…</p>
+      <div id="crop-wrap">
+        <div id="crop-stage">
+          <img id="crop-img" alt="Full photo" draggable="false"/>
+          <div id="crop-box"></div>
+        </div>
+      </div>
+      <div id="crop-controls">
+        <label for="crop-zoom">Zoom</label>
+        <input id="crop-zoom" type="range" min="1" max="3" step="0.01" value="1" />
+        <button class="btn btn-outline btn-sm" type="button" onclick="resetCropView()">Reset</button>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+        <button class="btn btn-outline btn-sm" onclick="closeCropModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="applyCrop()">Apply Headshot</button>
+      </div>
+    </div>
+  </div>
+
+  <datalist id="role-options">
+    <option value="HOUSEMAID"></option>
+    <option value="COOK"></option>
+    <option value="NANNY"></option>
+    <option value="CAREGIVER"></option>
+    <option value="DRIVER"></option>
+  </datalist>
+  <datalist id="height-options">
+    <option value="145 CM"></option>
+    <option value="150 CM"></option>
+    <option value="155 CM"></option>
+    <option value="160 CM"></option>
+    <option value="165 CM"></option>
+    <option value="170 CM"></option>
+  </datalist>
+  <datalist id="weight-options">
+    <option value="45 KG"></option>
+    <option value="50 KG"></option>
+    <option value="55 KG"></option>
+    <option value="60 KG"></option>
+    <option value="65 KG"></option>
+    <option value="70 KG"></option>
+  </datalist>
+  <datalist id="issue-place-options">
+    <option value="Colombo"></option>
+    <option value="Kandy"></option>
+    <option value="Galle"></option>
+    <option value="Jaffna"></option>
+    <option value="Kurunegala"></option>
+    <option value="Other"></option>
+  </datalist>
+  <datalist id="emp-position-options">
+    <option value="Housemaid"></option>
+    <option value="Cook"></option>
+    <option value="Nanny"></option>
+    <option value="Caregiver"></option>
+    <option value="Cleaner"></option>
+  </datalist>
+  <datalist id="emp-country-options">
+    <option value="Saudi Arabia"></option>
+    <option value="UAE"></option>
+    <option value="Kuwait"></option>
+    <option value="Qatar"></option>
+    <option value="Oman"></option>
+    <option value="Bahrain"></option>
+  </datalist>
+
+
+  <!-- ══════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════ -->
+  <script>
+    // ─── ADMIN AUTH GUARD ─────────────────────────────────────
+    (function() {
+      if (!sessionStorage.getItem('adminToken')) {
+        window.location.replace('admin.html');
+      }
+    })();
+
+    // ─── CONSTANTS ────────────────────────────────────────────
+    const LS_KEY = 'candidateProfiles';
+    const LOGO_KEY = 'foreignAgencyLogo';
+
+    let currentRecord = null;
+
+    // ─── UTILITIES ────────────────────────────────────────────
+    function uuid() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
+    function showToast(msg, ms = 2800) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), ms);
+    }
+
+    function dateLabel(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    // ─── JSON FILE STORAGE (API) ─────────────────────────────
+    // Every call carries builderAdminToken, set by builderLogin() below.
+    // A 401 means the token is missing/stale — bounce back to the login
+    // screen rather than silently failing.
+
+function handleAuthFailure(res) {
+  if (res.status === 401) {
+    sessionStorage.removeItem('adminToken');
+    showToast('Session expired — please sign in again.');
+    setTimeout(() => location.reload(), 1200);
+    return true;
+  }
+  return false;
+}
+
+async function apiGetAllRecords() {
+  const res = await fetch('api/list.php?admin_token=' + encodeURIComponent(builderAdminToken));
+  if (handleAuthFailure(res)) throw new Error('Unauthorized');
+  const out = await res.json();
+  if (!out.ok) throw new Error(out.error || 'Failed to list');
+  return out.records || [];
+}
+
+async function apiGetRecord(id) {
+  const res = await fetch('api/load.php?id=' + encodeURIComponent(id) + '&admin_token=' + encodeURIComponent(builderAdminToken));
+  if (handleAuthFailure(res)) throw new Error('Unauthorized');
+  const out = await res.json();
+  if (!out.ok) throw new Error(out.error || 'Failed to load');
+  return out.data;
+}
+
+async function apiSaveRecord(record) {
+  const res = await fetch('api/save.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...record, admin_token: builderAdminToken })
+  });
+  if (handleAuthFailure(res)) throw new Error('Unauthorized');
+  const out = await res.json();
+  if (!out.ok) throw new Error(out.error || 'Failed to save');
+  return out.data || record;
+}
+
+async function apiDeleteRecord(id) {
+  const res = await fetch('api/delete.php?id=' + encodeURIComponent(id) + '&admin_token=' + encodeURIComponent(builderAdminToken), { method: 'POST' });
+  if (handleAuthFailure(res)) throw new Error('Unauthorized');
+  const out = await res.json();
+  if (!out.ok) throw new Error(out.error || 'Failed to delete');
+  return true;
+}
+
+async function apiUploadImage(file, kind, recordId) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('recordId', recordId);
+  fd.append('type', kind);
+  fd.append('admin_token', builderAdminToken);
+  const res = await fetch('api/upload.php', { method: 'POST', body: fd });
+  if (handleAuthFailure(res)) throw new Error('Unauthorized');
+  const out = await res.json();
+  if (!out.ok) throw new Error(out.error || 'Upload failed');
+  return out; // { filename, url }
+}
+
+async function apiDeleteImage(filename) {
+  if (!filename) return;
+  try {
+    await fetch('api/delete_image.php?filename=' + encodeURIComponent(filename) + '&admin_token=' + encodeURIComponent(builderAdminToken), { method: 'POST' });
+  } catch {
+    // ignore
+  }
+}
+
+// ─── HOME ─────────────────────────────────────────────────
+    function formatShortDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    }
+
+    async function renderHome() {
+      let records = [];
+      try { records = await apiGetAllRecords(); } catch(e){ console.error(e); }
+
+      const profiles = records.filter(r => r.id !== '__global__');
+      const container = document.getElementById('saved-items-container');
+      if (!profiles.length) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <p>No profiles yet</p>
+            <small>Create your first applicant profile above</small>
+          </div>`;
+        return;
+      }
+      container.innerHTML = profiles.map(r => {
+        const role = r.fields?.['f-role'] ? escHtml(r.fields['f-role']) : '';
+        const nat = r.fields?.['f-nationality'] ? escHtml(r.fields['f-nationality']) : '';
+        const meta = [role, nat].filter(Boolean).join(' · ');
+        const ref = r.fields?.['f-refno'] ? escHtml(r.fields['f-refno']) : '';
+        return `
+          <div class="saved-item">
+            <div class="saved-item-info">
+              <span class="saved-item-name">${escHtml(r.fields?.['f-name'] || 'Unnamed')}</span>
+              ${meta ? `<span class="saved-item-meta">${meta}</span>` : ''}
+            </div>
+            <div class="saved-item-right">
+              ${ref ? `<span class="saved-item-ref">Ref: ${ref}</span>` : ''}
+              <span class="saved-item-date">${formatShortDate(r.savedAt)}</span>
+            </div>
+            <div class="saved-item-actions">
+              <button class="btn btn-primary btn-sm" onclick="openRecord('${r.id}')" title="Open profile">Open</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteRecord('${r.id}')" title="Delete profile">✕</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function safeFilenamePart(value, fallback = 'candidate') {
+      const clean = String(value || '')
+        .normalize('NFKD')
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 60);
+      return clean || fallback;
+    }
+
+    function getGlobalForeignLogo() {
+      try {
+        return localStorage.getItem(LOGO_KEY) || '';
+      } catch {
+        return '';
+      }
+    }
+
+    function setGlobalForeignLogo(filename) {
+      try {
+        if (filename) localStorage.setItem(LOGO_KEY, filename);
+        else localStorage.removeItem(LOGO_KEY);
+      } catch {
+        // ignore
+      }
+    }
+
+    function goHome() {
+      window.location.href = 'admin.html';
+    }
+
+    // ─── CREATE / OPEN ────────────────────────────────────────
+    function startNew() {
+      currentRecord = { id: uuid(), savedAt: null, fields: {}, images: {} };
+      document.getElementById('emp-tbody').innerHTML = '';
+      populateForm();
+      addEmpRow();
+      document.getElementById('form-title').textContent = 'New Profile';
+      document.getElementById('home-screen').style.display = 'none';
+      // form-screen is display:none in CSS, so explicitly show it
+      document.getElementById('form-screen').style.display = 'block';
+    }
+
+    async function openRecord(id) {
+  try {
+    const rec = await apiGetRecord(id);
+    if (!rec || typeof rec !== 'object') throw new Error('Record not found');
+    currentRecord = JSON.parse(JSON.stringify(rec));
+    document.getElementById('emp-tbody').innerHTML = '';
+    populateForm();
+    document.getElementById('form-title').textContent = currentRecord.fields['f-name'] || 'Profile';
+    document.getElementById('home-screen').style.display = 'none';
+    // form-screen is display:none in CSS, so explicitly show it
+    document.getElementById('form-screen').style.display = 'block';
+  } catch (e) {
+    console.error(e);
+    showToast('Record not found');
+  }
+}
+
+    async function deleteRecord(id) {
+  if (!confirm('Delete this profile?')) return;
+  try {
+    await apiDeleteRecord(id);
+    renderHome();
+    showToast('Profile deleted');
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Delete failed');
+  }
+}
+
+    // ─── POPULATE FORM ────────────────────────────────────────
+    function populateForm() {
+      const f = currentRecord.fields || {};
+      const textIds = [
+        'f-role', 'f-contract', 'f-refno', 'f-name',
+        'f-nationality', 'f-religion', 'f-dob', 'f-age',
+        'f-height', 'f-weight', 'f-marital', 'f-children',
+        'f-passport', 'f-pissue', 'f-doi', 'f-doe',
+        'f-edu', 'f-eduyear', 'footer-1', 'footer-2', 'footer-3',
+        'f-phone', 'f-whatsapp', 'f-email', 'f-emergency', 'f-address'
+      ];
+      textIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = f[id] !== undefined ? f[id] : el.defaultValue || '';
+      });
+      // defaults
+      if (!f['f-role']) document.getElementById('f-role').value = 'HOUSEMAID';
+      if (!f['f-contract']) document.getElementById('f-contract').value = '2 YEARS';
+
+      // Checkboxes
+      ['sk-cleaning', 'sk-washing', 'sk-babysitting', 'sk-cooking', 'sk-driving',
+        'lang-en-speak', 'lang-en-write', 'lang-ar-speak', 'lang-ar-write'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.checked = !!f[id];
+        });
+
+      
+// Photos
+['headshot', 'fullphoto'].forEach(key => {
+  const filename = currentRecord.images?.[key];
+  const wrap = document.getElementById(key + '-preview');
+  if (filename) {
+    wrap.innerHTML = `<img src="uploads/${filename}" alt="${key}"/>`;
+    wrap.classList.add('has-photo');
+  } else {
+    wrap.innerHTML = emptyPhotoLabel(key);
+    wrap.classList.remove('has-photo');
+  }
+});
+// Load document previews
+['doc-passport', 'doc-alteration'].forEach(key => {
+  renderDocPreview(key, currentRecord.images?.[key] || null);
+});
+// Show Adjust button if a full photo exists (so user can reposition headshot)
+const adjBtn = document.getElementById('headshot-adjust-btn');
+if (adjBtn) {
+  adjBtn.classList.toggle('hidden', !currentRecord.images?.fullphoto);
+}
+
+// Left logo (global)
+renderLeftLogoPreview();
+
+      // Employment rows
+      const rows = currentRecord.fields?.empRows || [];
+      document.getElementById('emp-tbody').innerHTML = '';
+      rows.forEach(r => addEmpRow(r));
+      if (!rows.length) addEmpRow();
+    }
+
+    // ─── COLLECT FORM ─────────────────────────────────────────
+    function collectForm() {
+      if (!currentRecord) return;
+      const f = {};
+      ['f-role', 'f-contract', 'f-refno', 'f-name',
+        'f-nationality', 'f-religion', 'f-dob', 'f-age',
+        'f-height', 'f-weight', 'f-marital', 'f-children',
+        'f-passport', 'f-pissue', 'f-doi', 'f-doe',
+        'f-edu', 'f-eduyear', 'footer-1', 'footer-2', 'footer-3',
+        'f-phone', 'f-whatsapp', 'f-email', 'f-emergency', 'f-address']
+        .forEach(id => { f[id] = document.getElementById(id)?.value || ''; });
+
+      ['sk-cleaning', 'sk-washing', 'sk-babysitting', 'sk-cooking', 'sk-driving',
+        'lang-en-speak', 'lang-en-write', 'lang-ar-speak', 'lang-ar-write']
+        .forEach(id => { f[id] = document.getElementById(id)?.checked || false; });
+
+      // Employment rows
+      f.empRows = [];
+      document.querySelectorAll('#emp-tbody tr').forEach(tr => {
+        const inputs = tr.querySelectorAll('input');
+        f.empRows.push({ position: inputs[0]?.value || '', country: inputs[1]?.value || '', period: inputs[2]?.value || '' });
+      });
+
+      currentRecord.fields = f;
+    }
+
+    // ─── EMPLOYMENT TABLE ─────────────────────────────────────
+    function addEmpRow(data = {}) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+    <td><input type="text" placeholder="Position" list="emp-position-options" value="${escHtml(data.position || '')}"/></td>
+    <td><input type="text" placeholder="Country" list="emp-country-options" value="${escHtml(data.country || '')}"/></td>
+    <td><input type="text" placeholder="e.g. 2 yrs" value="${escHtml(data.period || '')}"/></td>
+    <td><button class="btn btn-danger btn-sm btn-icon" onclick="this.closest('tr').remove()">✕</button></td>`;
+      document.getElementById('emp-tbody').appendChild(tr);
+    }
+
+    // ─── SAVE ─────────────────────────────────────────────────
+    async function saveRecord() {
+  collectForm();
+  if (!currentRecord) return;
+  currentRecord.savedAt = new Date().toISOString();
+  try {
+    const saved = await apiSaveRecord(currentRecord);
+    currentRecord = saved;
+    document.getElementById('form-title').textContent = currentRecord.fields['f-name'] || 'Profile';
+    showToast('✅ Profile saved!');
+    renderHome();
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Save failed');
+  }
+}
+
+    // ─── UPLOAD SVG ICON ──────────────────────────────────────
+    const UPLOAD_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`;
+
+    function emptyPhotoLabel(key) {
+      const label = key === 'headshot' ? 'Headshot' : 'Full Photo';
+      return `<span class="empty-label">${UPLOAD_SVG}<span>${label}</span><small>click or drag · PNG/JPG</small></span>`;
+    }
+
+    // ─── GLOBAL LOGO SERVER SYNC ──────────────────────────────
+    // The logo is stored in localStorage for fast access AND in a
+    // server-side __global__ record so it persists across devices / cache clears.
+    async function fetchServerLogo() {
+      try {
+        const res = await fetch('api/load.php?id=__global__&admin_token=' + encodeURIComponent(builderAdminToken));
+        const out = await res.json();
+        return (out.ok && out.data?.images?.foreignLogo) ? out.data.images.foreignLogo : null;
+      } catch { return null; }
+    }
+
+    async function saveServerLogo(filename) {
+      try {
+        await apiSaveRecord({
+          id: '__global__',
+          savedAt: new Date().toISOString(),
+          fields: {},
+          images: { foreignLogo: filename || '' }
+        });
+      } catch { /* non-fatal */ }
+    }
+
+    // ─── LEFT LOGO (global) ───────────────────────────────────
+async function handleLogoUpload(file) {
+  try {
+    const oldGlobal = getGlobalForeignLogo();
+    const out = await apiUploadImage(file, 'foreignLogo', 'global');
+    if (oldGlobal && oldGlobal !== out.filename) apiDeleteImage(oldGlobal);
+    setGlobalForeignLogo(out.filename);
+    saveServerLogo(out.filename); // persist to server (non-blocking)
+    renderLeftLogoPreview();
+    showToast('Foreign agency logo uploaded');
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Logo upload failed');
+  }
+}
+
+async function uploadLeftLogo(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  await handleLogoUpload(file);
+  event.target.value = '';
+}
+
+async function removeLeftLogo() {
+  const existing = getGlobalForeignLogo();
+  if (!existing) return;
+  if (!confirm('Remove the foreign agency logo?')) return;
+  setGlobalForeignLogo('');
+  saveServerLogo(''); // clear from server too
+  renderLeftLogoPreview();
+  apiDeleteImage(existing);
+  showToast('Foreign agency logo removed');
+}
+
+function renderLeftLogoPreview() {
+  const filename = getGlobalForeignLogo() || null;
+  const wrap = document.getElementById('left-logo-preview');
+  if (filename) {
+    wrap.innerHTML = `<img src="uploads/${filename}" alt="Foreign Agency Logo"/>`;
+    wrap.classList.add('has-photo');
+  } else {
+    wrap.innerHTML = `<span class="empty-label">${UPLOAD_SVG}<small>click or drag to upload</small></span>`;
+    wrap.classList.remove('has-photo');
+  }
+}
+
+    // ─── PHOTOS ───────────────────────────────────────────────
+
+    // ─── FACE DETECTION (face-api.js) ────────────────────────────
+    // Used only to auto-position the crop box in the modal.
+    // If detection fails the user drags manually — nothing breaks.
+    const _FW = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+    const HEADSHOT_ASPECT = 3 / 2;
+    const _nativeFaceDetector = 'FaceDetector' in window
+      ? new FaceDetector({ fastMode: true, maxDetectedFaces: 5 })
+      : null;
+    let _faceState = 'idle'; // idle | loading | ready | failed
+
+    async function _loadFace() {
+      if (_faceState === 'ready')   return true;
+      if (_faceState === 'failed')  return false;
+      if (_faceState === 'idle') {
+        if (!window.faceapi?.nets?.tinyFaceDetector) {
+          _faceState = 'failed';
+          return false;
+        }
+        _faceState = 'loading';
+        faceapi.nets.tinyFaceDetector.loadFromUri(_FW)
+          .then(() => { _faceState = 'ready'; })
+          .catch(() => { _faceState = 'failed'; });
+      }
+      // Poll until ready or failed (max 10 s)
+      const end = Date.now() + 10000;
+      while (_faceState === 'loading' && Date.now() < end)
+        await new Promise(r => setTimeout(r, 150));
+      return _faceState === 'ready';
+    }
+
+    function preloadFaceModel() {
+      _loadFace().catch(() => {});
+    }
+
+    async function _detectFaceNative(imgEl) {
+      if (!_nativeFaceDetector) return null;
+      try {
+        const detections = await _nativeFaceDetector.detect(imgEl);
+        if (!detections?.length) return null;
+        const best = detections
+          .map(det => det.boundingBox)
+          .sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+        return best ? { x: best.x, y: best.y, width: best.width, height: best.height } : null;
+      } catch {
+        return null;
+      }
+    }
+
+    async function _detectFaceWithApi(imgEl) {
+      try {
+        if (!await _loadFace()) return null;
+        const det = await faceapi.detectSingleFace(
+          imgEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 })
+        );
+        return det ? det.box : null;
+      } catch { return null; }
+    }
+
+    async function _detectFace(imgEl) {
+      return await _detectFaceNative(imgEl) || await _detectFaceWithApi(imgEl);
+    }
+
+    function _fitCropSize(width, height, maxW, maxH) {
+      let w = width;
+      let h = height;
+      if (w > maxW) {
+        w = maxW;
+        h = w / HEADSHOT_ASPECT;
+      }
+      if (h > maxH) {
+        h = maxH;
+        w = h * HEADSHOT_ASPECT;
+      }
+      return {
+        width: Math.max(1, Math.round(w)),
+        height: Math.max(1, Math.round(h))
+      };
+    }
+
+    function _clampCropRect(rect, imgW, imgH) {
+      const size = _fitCropSize(rect.width, rect.height, imgW, imgH);
+      return {
+        x: Math.max(0, Math.min(imgW - size.width, Math.round(rect.x))),
+        y: Math.max(0, Math.min(imgH - size.height, Math.round(rect.y))),
+        width: size.width,
+        height: size.height
+      };
+    }
+
+    function _defaultCropRect(imgW, imgH) {
+      const size = _fitCropSize(imgW * 0.52, (imgW * 0.52) / HEADSHOT_ASPECT, imgW, imgH * 0.72);
+      return _clampCropRect({
+        x: (imgW - size.width) / 2,
+        y: imgH * 0.06,
+        width: size.width,
+        height: size.height
+      }, imgW, imgH);
+    }
+
+    function _faceCropRect(faceBox, imgW, imgH) {
+      if (!faceBox) return _defaultCropRect(imgW, imgH);
+      let cropH = faceBox.height * 2.9;
+      let cropW = cropH * HEADSHOT_ASPECT;
+      const minW = faceBox.width * 2.35;
+      if (cropW < minW) {
+        cropW = minW;
+        cropH = cropW / HEADSHOT_ASPECT;
+      }
+      return _clampCropRect({
+        x: faceBox.x + (faceBox.width / 2) - (cropW / 2),
+        y: faceBox.y - (faceBox.height * 0.75),
+        width: cropW,
+        height: cropH
+      }, imgW, imgH);
+    }
+
+    const _cropUi = {
+      active: false,
+      pointerId: null,
+      startX: 0,
+      startY: 0,
+      startOffsetX: 0,
+      startOffsetY: 0,
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+      minScale: 1,
+      maxScale: 3,
+      frameW: 0,
+      frameH: 0,
+      sourceRect: null,
+      imageW: 0,
+      imageH: 0
+    };
+
+    function _setCropFrameSize(frameW) {
+      const stage = document.getElementById('crop-stage');
+      const box = document.getElementById('crop-box');
+      const frameH = Math.round(frameW / HEADSHOT_ASPECT);
+      stage.style.width = frameW + 'px';
+      stage.style.height = frameH + 'px';
+      box.style.width = frameW + 'px';
+      box.style.height = frameH + 'px';
+      _cropUi.frameW = frameW;
+      _cropUi.frameH = frameH;
+    }
+
+    function _applyCropImageTransform() {
+      const img = document.getElementById('crop-img');
+      if (!img || !_cropUi.frameW || !_cropUi.frameH) return;
+      const drawW = _cropUi.imageW * _cropUi.scale;
+      const drawH = _cropUi.imageH * _cropUi.scale;
+      img.style.width = Math.round(drawW) + 'px';
+      img.style.height = Math.round(drawH) + 'px';
+      img.style.left = Math.round(_cropUi.offsetX) + 'px';
+      img.style.top = Math.round(_cropUi.offsetY) + 'px';
+    }
+
+    function _clampCropOffsets() {
+      const drawW = _cropUi.imageW * _cropUi.scale;
+      const drawH = _cropUi.imageH * _cropUi.scale;
+      const minX = Math.min(0, _cropUi.frameW - drawW);
+      const minY = Math.min(0, _cropUi.frameH - drawH);
+      _cropUi.offsetX = Math.max(minX, Math.min(0, _cropUi.offsetX));
+      _cropUi.offsetY = Math.max(minY, Math.min(0, _cropUi.offsetY));
+    }
+
+    function _updateCropZoom(value, anchorX = _cropUi.frameW / 2, anchorY = _cropUi.frameH / 2) {
+      const nextScale = Math.max(_cropUi.minScale, Math.min(_cropUi.maxScale, value));
+      const prevScale = _cropUi.scale;
+      if (!_cropUi.sourceRect || !prevScale) return;
+      const imgX = (anchorX - _cropUi.offsetX) / prevScale;
+      const imgY = (anchorY - _cropUi.offsetY) / prevScale;
+      _cropUi.scale = nextScale;
+      _cropUi.offsetX = anchorX - (imgX * nextScale);
+      _cropUi.offsetY = anchorY - (imgY * nextScale);
+      _clampCropOffsets();
+      _applyCropImageTransform();
+      document.getElementById('crop-zoom').value = String(nextScale);
+    }
+
+    function _setCropFromRect(rect, imgEl) {
+      const stageWrap = document.getElementById('crop-wrap');
+      const frameW = Math.min(Math.round(stageWrap.clientWidth), 380);
+      _setCropFrameSize(frameW);
+      _cropUi.sourceRect = rect;
+      _cropUi.imageW = imgEl.naturalWidth;
+      _cropUi.imageH = imgEl.naturalHeight;
+      _cropUi.minScale = Math.max(_cropUi.frameW / _cropUi.imageW, _cropUi.frameH / _cropUi.imageH, 1);
+      const focusScale = Math.max(_cropUi.frameW / rect.width, _cropUi.frameH / rect.height, _cropUi.minScale);
+      _cropUi.maxScale = Math.max(_cropUi.minScale + 1.8, _cropUi.minScale * 2.2);
+      _cropUi.scale = Math.min(focusScale, _cropUi.maxScale);
+      _cropUi.offsetX = ((_cropUi.frameW - (rect.width * _cropUi.scale)) / 2) - (rect.x * _cropUi.scale);
+      _cropUi.offsetY = ((_cropUi.frameH - (rect.height * _cropUi.scale)) / 2) - (rect.y * _cropUi.scale);
+      _clampCropOffsets();
+      const zoom = document.getElementById('crop-zoom');
+      zoom.min = String(_cropUi.minScale);
+      zoom.max = String(_cropUi.maxScale);
+      zoom.step = String(Math.max((_cropUi.maxScale - _cropUi.minScale) / 200, 0.01));
+      zoom.value = String(_cropUi.scale);
+      _applyCropImageTransform();
+    }
+
+    function _getEditorCropRect() {
+      const scale = _cropUi.scale;
+      return _clampCropRect({
+        x: (-_cropUi.offsetX) / scale,
+        y: (-_cropUi.offsetY) / scale,
+        width: _cropUi.frameW / scale,
+        height: _cropUi.frameH / scale
+      }, _cropUi.imageW, _cropUi.imageH);
+    }
+
+    function resetCropView() {
+      const img = document.getElementById('crop-img');
+      if (!_cropUi.sourceRect || !img?.naturalWidth) return;
+      _setCropFromRect(_cropUi.sourceRect, img);
+    }
+
+    async function _loadImage(src) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = src;
+      });
+      return img;
+    }
+
+    async function _saveHeadshotRect(rect, successMessage = '✅ Headshot saved') {
+      const orig = await _loadImage('uploads/' + currentRecord.images.fullphoto + '?t=' + Date.now());
+      const crop = _clampCropRect(rect, orig.naturalWidth, orig.naturalHeight);
+      const canvas = document.createElement('canvas');
+      canvas.width = crop.width;
+      canvas.height = crop.height;
+      canvas.getContext('2d').drawImage(
+        orig,
+        crop.x, crop.y, crop.width, crop.height,
+        0, 0, crop.width, crop.height
+      );
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
+      const file = new File([blob], 'headshot.jpg', { type: 'image/jpeg' });
+      const old = currentRecord.images.headshot;
+      const out = await apiUploadImage(file, 'headshot', currentRecord.id);
+      if (old && old !== out.filename) apiDeleteImage(old);
+      currentRecord.images.headshot = out.filename;
+      const hw = document.getElementById('headshot-preview');
+      hw.innerHTML = `<img src="uploads/${out.filename}" alt="headshot"/>`;
+      hw.classList.add('has-photo');
+      document.getElementById('headshot-adjust-btn').classList.remove('hidden');
+      showToast(successMessage);
+      return out;
+    }
+
+    async function autoGenerateHeadshotFromFullPhoto() {
+      if (!currentRecord?.images?.fullphoto) return;
+      showToast('⏳ Auto-cropping headshot…');
+      try {
+        const img = await _loadImage('uploads/' + currentRecord.images.fullphoto + '?t=' + Date.now());
+        const face = await _detectFace(img);
+        const rect = _faceCropRect(face, img.naturalWidth, img.naturalHeight);
+        await _saveHeadshotRect(rect, face
+          ? '✅ Headshot auto-cropped'
+          : '✅ Headshot cropped with fallback framing');
+      } catch (e) {
+        console.error(e);
+        showToast('❌ Failed to auto-crop headshot');
+      }
+    }
+
+    async function handlePhotoUpload(file, key) {
+      if (!currentRecord) startNew();
+      const kind = key === 'headshot' ? 'headshot' : 'fullPhoto';
+      try {
+        const out = await apiUploadImage(file, kind, currentRecord.id);
+        if (!currentRecord.images) currentRecord.images = {};
+        if (currentRecord.images[key] && currentRecord.images[key] !== out.filename)
+          apiDeleteImage(currentRecord.images[key]);
+        currentRecord.images[key] = out.filename;
+        const wrap = document.getElementById(key + '-preview');
+        wrap.innerHTML = `<img src="uploads/${out.filename}" alt="${key}"/>`;
+        wrap.classList.add('has-photo');
+        if (key === 'fullphoto') {
+          await autoGenerateHeadshotFromFullPhoto();
+        } else {
+          showToast('Photo uploaded');
+        }
+      } catch (e) {
+        console.error(e);
+        showToast('❌ Photo upload failed');
+      }
+    }
+
+    function openCropModal() {
+      if (!currentRecord?.images?.fullphoto) return showToast('Upload full photo first');
+      const img = document.getElementById('crop-img');
+      const status = document.getElementById('crop-status');
+      status.textContent = 'Loading photo…';
+      document.getElementById('crop-modal').classList.add('open');
+      img.onload = async () => {
+        const fallbackRect = _defaultCropRect(img.naturalWidth, img.naturalHeight);
+        _setCropFromRect(fallbackRect, img);
+        status.textContent = '🤖 Detecting face…';
+        const det = await _detectFace(img);
+        if (det) {
+          _setCropFromRect(_faceCropRect(det, img.naturalWidth, img.naturalHeight), img);
+          status.textContent = '✓ Face detected — drag the photo and use zoom, then click Apply';
+        } else {
+          status.textContent = 'Face not detected — fallback crop applied. Drag the photo and use zoom, then click Apply';
+        }
+      };
+      img.src = 'uploads/' + currentRecord.images.fullphoto + '?t=' + Date.now();
+    }
+
+    function closeCropModal() {
+      document.getElementById('crop-modal').classList.remove('open');
+    }
+
+    async function applyCrop() {
+      if (!currentRecord?.images?.fullphoto) return;
+      const rect = _getEditorCropRect();
+      closeCropModal();
+      showToast('⏳ Saving headshot…');
+      try {
+        await _saveHeadshotRect(rect);
+      } catch (e) {
+        console.error(e);
+        showToast('❌ Failed to save headshot');
+      }
+    }
+
+    // Drag the image inside the fixed crop frame
+    (function () {
+      const getStage = () => document.getElementById('crop-stage');
+      const onStart = (cx, cy, pointerId = null) => {
+        if (!_cropUi.sourceRect) return;
+        _cropUi.active = true;
+        _cropUi.pointerId = pointerId;
+        _cropUi.startX = cx;
+        _cropUi.startY = cy;
+        _cropUi.startOffsetX = _cropUi.offsetX;
+        _cropUi.startOffsetY = _cropUi.offsetY;
+      };
+      const onMove = (cx, cy) => {
+        if (!_cropUi.active) return;
+        _cropUi.offsetX = _cropUi.startOffsetX + (cx - _cropUi.startX);
+        _cropUi.offsetY = _cropUi.startOffsetY + (cy - _cropUi.startY);
+        _clampCropOffsets();
+        _applyCropImageTransform();
+      };
+      const onEnd = (pointerId = null) => {
+        if (pointerId !== null && _cropUi.pointerId !== null && pointerId !== _cropUi.pointerId) return;
+        _cropUi.active = false;
+        _cropUi.pointerId = null;
+      };
+      document.addEventListener('mousedown',  e => { if (getStage()?.contains(e.target)) { onStart(e.clientX, e.clientY); e.preventDefault(); } });
+      document.addEventListener('mousemove',  e => onMove(e.clientX, e.clientY));
+      document.addEventListener('mouseup',    onEnd);
+      document.addEventListener('touchstart', e => {
+        if (getStage()?.contains(e.target)) {
+          const t = e.touches[0];
+          onStart(t.clientX, t.clientY, t.identifier);
+          e.preventDefault();
+        }
+      }, { passive: false });
+      document.addEventListener('touchmove',  e => {
+        if (_cropUi.active) {
+          const touch = [...e.touches].find(t => t.identifier === _cropUi.pointerId) || e.touches[0];
+          if (touch) {
+            onMove(touch.clientX, touch.clientY);
+            e.preventDefault();
+          }
+        }
+      }, { passive: false });
+      document.addEventListener('touchend',   e => {
+        const touch = [...e.changedTouches].find(t => t.identifier === _cropUi.pointerId);
+        onEnd(touch ? touch.identifier : null);
+      });
+      document.getElementById('crop-zoom').addEventListener('input', e => {
+        _updateCropZoom(Number(e.target.value));
+      });
+    })();
+
+    async function uploadPhoto(event, key) {
+  const file = event.target.files[0];
+  if (!file) return;
+  await handlePhotoUpload(file, key);
+  event.target.value = '';
+}
+
+    function removePhoto(key) {
+  const old = currentRecord?.images ? currentRecord.images[key] : null;
+  if (currentRecord?.images) delete currentRecord.images[key];
+  const wrap = document.getElementById(key + '-preview');
+  wrap.innerHTML = emptyPhotoLabel(key);
+  wrap.classList.remove('has-photo');
+  if (key === 'fullphoto') {
+    document.getElementById('headshot-adjust-btn').classList.add('hidden');
+  }
+  if (old) apiDeleteImage(old);
+}
+
+    async function uploadDoc(event, key) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      if (!currentRecord) startNew();
+      try {
+        const out = await apiUploadImage(file, key, currentRecord.id);
+        if (!currentRecord.images) currentRecord.images = {};
+        if (currentRecord.images[key] && currentRecord.images[key] !== out.filename)
+          apiDeleteImage(currentRecord.images[key]);
+        currentRecord.images[key] = out.filename;
+        renderDocPreview(key, out.filename);
+        showToast('Document uploaded');
+      } catch(e) {
+        showToast('❌ Document upload failed');
+      }
+    }
+
+    function removeDoc(key) {
+      const old = currentRecord?.images?.[key];
+      if (currentRecord?.images) delete currentRecord.images[key];
+      renderDocPreview(key, null);
+      if (old) apiDeleteImage(old);
+    }
+
+    function renderDocPreview(key, filename) {
+      const wrap = document.getElementById(key + '-preview');
+      if (!wrap) return;
+      if (!filename) {
+        const label = key === 'doc-passport' ? 'Passport' : 'Alteration Page';
+        wrap.innerHTML = `<span class="empty-label"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>${label}</span></span>`;
+        wrap.classList.remove('has-photo');
+      } else if (filename.toLowerCase().endsWith('.pdf')) {
+        wrap.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;padding:10px;"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span style="font-size:.72rem;font-weight:600;word-break:break-all;text-align:center;">${filename.split('_').slice(-1)[0]}</span></div>`;
+        wrap.classList.add('has-photo');
+      } else {
+        wrap.innerHTML = `<img src="uploads/${filename}" alt="${key}" style="max-width:100%;max-height:100%;object-fit:contain;" />`;
+        wrap.classList.add('has-photo');
+      }
+    }
+
+    // ─── BUILD PDF LAYOUT DOM ─────────────────────────────────
+    function buildPdfLayout() {
+      collectForm();
+      const f = currentRecord?.fields || {};
+      const im = currentRecord?.images || {};
+      const leftLogo = getGlobalForeignLogo() || im.foreignLogo || null;
+
+      // Header
+      document.getElementById('pdf-role-title').textContent = (f['f-role'] || 'HOUSEMAID').toUpperCase();
+      document.getElementById('pdf-contract-bar').textContent =
+        'Contract: ' + (f['f-contract'] || '2 Years');
+
+      // Modern header title/subtitle (supports dark logos)
+      const titleEl = document.getElementById('pdf-header-title');
+      const subEl = document.getElementById('pdf-header-sub');
+      if (titleEl) titleEl.textContent = 'CANDIDATE PROFILE';
+      if (subEl) subEl.textContent = 'Applicant Information Sheet';
+
+      // Left logo
+      document.getElementById('pdf-left-logo-wrap').innerHTML = leftLogo
+        ? `<img src="uploads/${leftLogo}" class="pdf-logo" alt="Agency"/>`
+        : '<div class="pdf-logo-empty">Foreign agency logo</div>';
+
+      // Optional flag (kept minimal; can be extended later)
+      // pdf-flag-wrap removed from layout
+
+      // Full photo (right column)
+      document.getElementById('pdf-fullphoto-wrap').innerHTML = im.fullphoto
+        ? `<img src="uploads/${im.fullphoto}" alt="Full Photo"/>`
+        : '<span class="pdf-placeholder">Full Photo</span>';
+
+      // Headshot (top-right)
+      document.getElementById('pdf-headshot-wrap').innerHTML = im.headshot
+        ? `<img src="uploads/${im.headshot}" alt="Headshot"/>`
+        : '<span class="pdf-placeholder">Headshot</span>';
+
+      // Skills (table format like template)
+      const skills = [
+        { id: 'sk-cleaning', label: 'Cleaning' },
+        { id: 'sk-washing', label: 'Washing' },
+        { id: 'sk-babysitting', label: 'Baby Sitting' },
+        { id: 'sk-cooking', label: 'Arabic Cooking' },
+        { id: 'sk-driving', label: 'Driving' },
+      ];
+      document.getElementById('pdf-skills-table').innerHTML = skills.map(s =>
+        `<tr>
+           <td class="pdf-skill-label">${s.label}</td>
+           <td class="pdf-skill-check"><span class="pdf-boxcb ${f[s.id] ? 'checked' : ''}">${f[s.id] ? '✕' : ''}</span></td>
+         </tr>`
+      ).join('');
+
+      // Language
+      document.getElementById('pdf-lang-tbody').innerHTML = [
+        { lang: 'English', speak: f['lang-en-speak'], write: f['lang-en-write'] },
+        { lang: 'Arabic', speak: f['lang-ar-speak'], write: f['lang-ar-write'] },
+      ].map(l =>
+        `<tr>
+       <td>${l.lang}</td>
+       <td><span class="pdf-boxcb">${l.speak ? '✕' : ''}</span></td>
+       <td><span class="pdf-boxcb">${l.write ? '✕' : ''}</span></td>
+     </tr>`).join('');
+
+      // Ref under full photo (like template: "Ref No." then name)
+      document.getElementById('pdf-ref-under').innerHTML =
+        `<div class="pdf-ref-no">Ref No. ${escHtml(f['f-refno'] || '')}</div>
+         <div class="pdf-ref-name">${escHtml(f['f-name'] || '')}</div>`;
+
+      // Personal info
+      const personalRows = [
+        ['Nationality', f['f-nationality'] || ''],
+        ['Religion', f['f-religion'] || ''],
+        ['D.O.B', dateLabel(f['f-dob'])],
+        ['Age', f['f-age'] || ''],
+        ['Height', f['f-height'] || ''],
+        ['Weight', f['f-weight'] || ''],
+        ['Marital Status', f['f-marital'] || ''],
+        ['Children (No.)', f['f-children'] || ''],
+      ];
+      document.getElementById('pdf-personal-table').innerHTML =
+        personalRows.map(([l, v]) => `<tr><td class="pdf-lbl">${l}</td><td class="pdf-val">${escHtml(v)}</td></tr>`).join('');
+
+      // Passport
+      document.getElementById('pdf-passport-table').innerHTML = [
+        ['Passport No.', f['f-passport'] || ''],
+        ['Date of Issue', dateLabel(f['f-doi'])],
+        ['Date of Expiry', dateLabel(f['f-doe'])],
+        ['Place of Issue', f['f-pissue'] || ''],
+      ].map(([l, v]) => `<tr><td class="pdf-lbl">${l}</td><td class="pdf-val">${escHtml(v)}</td></tr>`).join('');
+
+      // Education
+      document.getElementById('pdf-edu-table').innerHTML =
+        `<tr><th colspan="2" class="pdf-table-section">EDUCATIONAL QUALIFICATION</th></tr>
+         <tr><td class="pdf-lbl">GRADE</td><td class="pdf-val">${escHtml(f['f-edu'] || '')}</td></tr>
+         <tr><td class="pdf-lbl">YEAR</td><td class="pdf-val">${escHtml(f['f-eduyear'] || '')}</td></tr>`;
+
+      // Employment
+      const empRows = f.empRows || [];
+      document.getElementById('pdf-emp-tbody').innerHTML = empRows.length
+        ? empRows.map(r =>
+          `<tr><td>${escHtml(r.position)}</td><td>${escHtml(r.country)}</td><td>${escHtml(r.period)}</td></tr>`
+        ).join('')
+        : '<tr><td colspan="3" style="color:#aac4ce;text-align:center;font-size:7pt;">—</td></tr>';
+
+      // Footer
+      const lines = [f['footer-1'], f['footer-2'], f['footer-3']].filter(Boolean);
+      document.getElementById('pdf-footer').innerHTML = lines.map(l => escHtml(l)).join('<br/>') || '&nbsp;';
+    }
+
+    // ─── PREVIEW ──────────────────────────────────────────────
+    async function openPreview() {
+      buildPdfLayout();
+      const layout = document.getElementById('pdf-layout');
+      const wrap = document.getElementById('preview-wrap');
+      const overlay = document.getElementById('preview-modal');
+
+      layout.style.display = 'flex';
+      wrap.innerHTML = '';
+      wrap.appendChild(layout);
+
+      const scale = Math.max(0.38, Math.min(1, (window.innerWidth - 80) / 794));
+      layout.style.transform = `scale(${scale})`;
+      layout.style.transformOrigin = 'top left';
+      wrap.style.overflow = 'auto';
+
+      await waitForImages(layout);
+      const contentHeight = Math.max(1123, layout.scrollHeight);
+      wrap.style.height = Math.ceil(contentHeight * scale) + 'px';
+
+      overlay.classList.add('open');
+    }
+
+    function closePreview() {
+      const layout = document.getElementById('pdf-layout');
+      const container = document.getElementById('pdf-layout-container');
+      layout.style.display = 'none';
+      layout.style.transform = '';
+      layout.style.transformOrigin = '';
+      container.appendChild(layout);
+      document.getElementById('preview-modal').classList.remove('open');
+    }
+
+    // ─── EXPORT PDF ───────────────────────────────────────────
+    async function exportPDF() {
+      showToast('⏳ Generating PDF…', 8000);
+
+      if (!window.html2canvas || !window.jspdf?.jsPDF) {
+        showToast('❌ PDF library failed to load. Check internet/CDN access.');
+        return;
+      }
+
+      buildPdfLayout();
+      const layout = document.getElementById('pdf-layout');
+      const container = document.getElementById('pdf-layout-container');
+
+      document.getElementById('preview-modal').classList.remove('open');
+      layout.style.transform = '';
+      layout.style.transformOrigin = '';
+      container.appendChild(layout);
+      layout.style.display = 'flex';
+      container.style.left = '0';
+      container.style.opacity = '0';
+      container.style.pointerEvents = 'none';
+
+      // Ensure all images (logos + photos) are fully loaded before capture.
+      if (document.fonts?.ready) {
+        try { await document.fonts.ready; } catch { /* ignore */ }
+      }
+      await waitForImages(layout);
+      await new Promise(r => setTimeout(r, 150));
+
+      try {
+        const contentHeight = Math.max(1123, layout.scrollHeight);
+        let canvas;
+        try {
+          canvas = await capturePdfCanvas(layout, contentHeight, false);
+          // Probe immediately so taint issues can trigger fallback.
+          canvas.toDataURL('image/jpeg', 0.98);
+        } catch (probeErr) {
+          const isTainted = probeErr && (probeErr.name === 'SecurityError' || String(probeErr).includes('Tainted canvases'));
+          if (!isTainted) throw probeErr;
+          showToast('⚠ Image CORS issue detected. Exporting without images.');
+          canvas = await capturePdfCanvas(layout, contentHeight, true);
+        }
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        const pdfWidth = 210;
+        const pdfHeight = 297;
+        const scale = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height);
+        const drawW = canvas.width * scale;
+        const drawH = canvas.height * scale;
+        const offsetX = (pdfWidth - drawW) / 2;
+        const offsetY = (pdfHeight - drawH) / 2;
+        pdf.addImage(imgData, 'JPEG', offsetX, offsetY, drawW, drawH);
+
+        const name = safeFilenamePart(currentRecord?.fields?.['f-name'], 'candidate');
+        const ref = safeFilenamePart(currentRecord?.fields?.['f-refno'], '');
+        pdf.save(`${ref ? ref + '_' : ''}${name}_profile.pdf`);
+
+        layout.style.display = 'none';
+        container.style.left = '-9999px';
+        container.style.opacity = '';
+        container.style.pointerEvents = '';
+        showToast('✅ PDF exported successfully!');
+      } catch (err) {
+        console.error('PDF export error:', err);
+        showToast('❌ PDF export failed — check console.');
+        layout.style.display = 'none';
+        container.style.left = '-9999px';
+        container.style.opacity = '';
+        container.style.pointerEvents = '';
+      }
+    }
+
+    function waitForImages(rootEl) {
+      const imgs = Array.from(rootEl.querySelectorAll('img'));
+      if (!imgs.length) return Promise.resolve();
+      return Promise.all(imgs.map(img => new Promise(resolve => {
+        // Already loaded
+        if (img.complete && img.naturalWidth > 0) return resolve();
+        const done = () => resolve();
+        img.addEventListener('load', done, { once: true });
+        img.addEventListener('error', done, { once: true });
+      })));
+    }
+
+    async function capturePdfCanvas(layout, captureHeight, hideImages = false) {
+      const imgs = Array.from(layout.querySelectorAll('img'));
+      const prevVisibility = [];
+      if (hideImages) {
+        imgs.forEach((img, i) => {
+          prevVisibility[i] = img.style.visibility;
+          img.style.visibility = 'hidden';
+        });
+      }
+
+      try {
+        return await html2canvas(layout, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          logging: false,
+          width: 794,
+          height: captureHeight,
+        });
+      } finally {
+        if (hideImages) {
+          imgs.forEach((img, i) => {
+            img.style.visibility = prevVisibility[i] || '';
+          });
+        }
+      }
+    }
+
+    // ─── DRAG AND DROP ────────────────────────────────────────
+    function initDragDrop(previewId, key) {
+      const el = document.getElementById(previewId);
+      if (!el) return;
+
+      el.addEventListener('dragover', e => {
+        e.preventDefault();
+        el.classList.add('drag-active');
+      });
+
+      el.addEventListener('dragleave', e => {
+        if (!el.contains(e.relatedTarget)) el.classList.remove('drag-active');
+      });
+
+      el.addEventListener('drop', async e => {
+        e.preventDefault();
+        el.classList.remove('drag-active');
+        const file = e.dataTransfer?.files?.[0];
+        if (!file) return;
+        if (!file.type.match(/image\/(png|jpeg)/)) {
+          showToast('Please drop a PNG or JPG image');
+          return;
+        }
+        await handlePhotoUpload(file, key);
+      });
+    }
+
+    function initLogoDragDrop() {
+      const el = document.getElementById('left-logo-preview');
+      if (!el) return;
+
+      el.addEventListener('dragover', e => {
+        e.preventDefault();
+        el.classList.add('drag-active');
+      });
+
+      el.addEventListener('dragleave', e => {
+        if (!el.contains(e.relatedTarget)) el.classList.remove('drag-active');
+      });
+
+      el.addEventListener('drop', async e => {
+        e.preventDefault();
+        el.classList.remove('drag-active');
+        const file = e.dataTransfer?.files?.[0];
+        if (!file) return;
+        if (!file.type.match(/image\/(png|jpeg)/)) {
+          showToast('Please drop a PNG or JPG image');
+          return;
+        }
+        await handleLogoUpload(file);
+      });
+    }
+
+    // ─── MODAL BACKDROP CLOSE ─────────────────────────────────
+    document.getElementById('preview-modal').addEventListener('click', function (e) {
+      if (e.target === this) closePreview();
+    });
+
+    // ─── INIT ─────────────────────────────────────────────────
+    // ─── AUTH GATE ────────────────────────────────────────────
+    let builderAdminToken = '';
+
+    async function builderInit() {
+      // Sync global logo from server if localStorage is empty or stale
+      if (!getGlobalForeignLogo()) {
+        const serverLogo = await fetchServerLogo();
+        if (serverLogo) setGlobalForeignLogo(serverLogo);
+      }
+      renderLeftLogoPreview();
+
+      // Auto-open profile if ?id= present, or start new if ?new=1
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('id')) {
+        await openRecord(params.get('id'));
+      } else if (params.get('new') === '1') {
+        startNew();
+      } else {
+        // Show the form-screen directly in admin mode — no standalone home needed
+        startNew();
+      }
+      initDragDrop('headshot-preview', 'headshot');
+      initDragDrop('fullphoto-preview', 'fullphoto');
+      initLogoDragDrop();
+      // Preload face detection model in background so it's ready when user uploads
+      preloadFaceModel();
+    }
+
+    async function showBuilderApp() {
+      document.getElementById('builder-login-screen').style.display = 'none';
+      await builderInit();
+    }
+
+    async function builderLogin() {
+      const btn = document.getElementById('builder-login-btn');
+      const err = document.getElementById('builder-login-error');
+      const pass = document.getElementById('builder-login-pass').value;
+      err.style.display = 'none';
+      if (!pass) { err.textContent = 'Please enter the admin password.'; err.style.display = 'block'; return; }
+      btn.disabled = true; btn.textContent = 'Signing in…';
+      try {
+        const res = await fetch('api/admin_agents.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'admin_login', password: pass }) });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Wrong password');
+        builderAdminToken = data.adminToken;
+        sessionStorage.setItem('adminToken', builderAdminToken);
+        await showBuilderApp();
+      } catch (e) {
+        err.textContent = e.message; err.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Sign In';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('builder-login-pass')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') builderLogin();
+      });
+      // Same-origin nav from admin.html shares this tab's sessionStorage —
+      // skip straight to the app when a valid admin session already exists.
+      const saved = sessionStorage.getItem('adminToken');
+      if (saved) {
+        builderAdminToken = saved;
+        await showBuilderApp();
+      }
+    });
+  </script>
+
+</body>
+
+</html>
