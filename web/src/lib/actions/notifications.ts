@@ -55,16 +55,17 @@ export async function checkContractClosureNotifications(triggeringUser: SessionU
     const recipientIds = new Set(admins.map((a) => a.id));
     if (placement?.agent.userId) recipientIds.add(placement.agent.userId);
 
-    await db.$transaction(async (tx) => {
-      for (const userId of recipientIds) {
-        await tx.notification.create({
-          data: { candidateId, userId, type: "CONTRACT_CLOSED" },
-        });
-      }
-      await runAsActor(triggeringUser, () =>
-        tx.tracking.update({ where: { candidateId }, data: { contractClosureNotified: true } }),
-      );
-    });
+    // Array-batch, not the interactive callback form — every value here is
+    // already known before this point, nothing needs to be read back
+    // mid-transaction. See the long comment on the datasource block in
+    // schema.prisma for why that distinction matters (dbDirect isn't
+    // needed for this one).
+    await runAsActor(triggeringUser, () =>
+      db.$transaction([
+        ...[...recipientIds].map((userId) => db.notification.create({ data: { candidateId, userId, type: "CONTRACT_CLOSED" } })),
+        db.tracking.update({ where: { candidateId }, data: { contractClosureNotified: true } }),
+      ]),
+    );
   }
 }
 
@@ -200,28 +201,30 @@ export async function approveDatabankRequest(input: {
     if (!candidate) throw new ActionError("Candidate not found");
     if (!agent) throw new ActionError("Agent not found");
 
-    await db.$transaction(async (tx) => {
-      const current = await tx.placement.findFirst({
-        where: { candidateId: input.candidateId, isCurrent: true },
-      });
-      if (current && current.agentId !== input.agentId) {
-        await runAsActor(user, () =>
-          tx.placement.update({
-            where: { id: current.id },
-            data: { isCurrent: false, endDate: new Date(), changeReason: "Reassigned via databank request" },
-          }),
-        );
-      }
-      if (!current || current.agentId !== input.agentId) {
-        await runAsActor(user, () =>
-          tx.placement.create({ data: { candidateId: input.candidateId, agentId: input.agentId } }),
-        );
-      }
-      await tx.notification.updateMany({
-        where: { candidateId: input.candidateId, type: databankRequestType(input.agentId), seenAt: null },
-        data: { seenAt: new Date() },
-      });
+    // Same read-outside-then-batch pattern as agents.ts's
+    // assignCandidateToAgent()/changeEmployer() — see their comments.
+    const current = await db.placement.findFirst({
+      where: { candidateId: input.candidateId, isCurrent: true },
     });
+    const alreadyThere = current?.agentId === input.agentId;
+
+    await runAsActor(user, () =>
+      db.$transaction([
+        ...(current && !alreadyThere
+          ? [
+              db.placement.update({
+                where: { id: current.id },
+                data: { isCurrent: false, endDate: new Date(), changeReason: "Reassigned via databank request" },
+              }),
+            ]
+          : []),
+        ...(!alreadyThere ? [db.placement.create({ data: { candidateId: input.candidateId, agentId: input.agentId } })] : []),
+        db.notification.updateMany({
+          where: { candidateId: input.candidateId, type: databankRequestType(input.agentId), seenAt: null },
+          data: { seenAt: new Date() },
+        }),
+      ]),
+    );
     return null;
   });
 }

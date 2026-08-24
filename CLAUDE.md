@@ -613,6 +613,86 @@ under Phase 0 below — build the new one.
   **Still local-only / not yet done**: Upstash Redis (rate limiting/session blacklist still the
   in-memory stand-in) and Resend (email still the local `.log` stand-in) — same adapter-swap
   pattern as storage, whenever the user wants those provisioned too.
+- **Live on Vercel — done, after finding and fixing a real connection-pooling architecture
+  problem the hard way.** The user pointed out an existing Vercel deployment
+  (`topway-mu.vercel.app`) was showing the legacy static `admin.html`, not the rebuilt app —
+  traced to: the Vercel project (under the newer `shibz786`-linked GitHub account, connected via
+  auto-deploy on push) had Root Directory `.` and no framework detected, since the real app lives
+  in `web/`, not the repo root. `gh`/`vercel` CLI auth both used the same non-interactive
+  device-code pattern (a URL the user opens and approves in their own browser — `gh auth login`
+  falls back to this automatically outside a TTY; `vercel login` does too). Fixed Root Directory
+  (`web`) and framework (`nextjs`) via the Vercel Management API (no CLI subcommand for either),
+  pushed the real env vars, and hit a real Prisma+Vercel gotcha immediately: Vercel caches
+  dependencies, which skips Prisma's postinstall codegen, so the client is stale — fixed with a
+  `"postinstall": "prisma generate"` script (the standard fix; not optional once deployed here).
+  **Then a real, three-iteration architecture problem**, each iteration a genuine live failure,
+  not a guess — full story lives as a long comment on the `datasource` block in
+  `web/prisma/schema.prisma` (read that before ever touching `DATABASE_URL`/`DIRECT_URL` again):
+  1. `DATABASE_URL` on Supabase's transaction-mode pooler (port 6543) broke invoice-number
+     allocation's interactive `$transaction()` (SERIALIZABLE isolation) — PgBouncer's
+     transaction-pooling mode can route different statements within one logical transaction to
+     different backend connections. Symptom was silent, not a thrown error: `createInvoice`
+     reported success and navigated to the new invoice's page, but the row was never actually
+     written — caught by directly querying the database after a "successful" test run.
+  2. Switched to session-mode pooling (port 5432, same pooler host) — interactive transactions
+     work correctly there, but it broke under real concurrent Vercel traffic instead: each
+     serverless instance holds one dedicated connection for its whole lifetime in session mode,
+     and session mode's connection budget is much smaller (this project: hard-capped at 15) —
+     the very first login on a fresh deploy succeeded, every one after it failed with
+     `FATAL: max clients reached in session mode`.
+  3. Tried adding a *second* Prisma client (`dbDirect`) bound to a session-mode connection, used
+     only for the app's handful of genuinely interactive transactions (rare enough that #2's
+     budget shouldn't matter) — this is a legitimate, commonly-recommended pattern in principle.
+     A raw TCP probe (a temporary diagnostic route, deleted after use) confirmed the port was
+     reachable in under 250ms. But every actual Prisma query through it still just hung
+     indefinitely with no error at all, never conclusively diagnosed (leading theory: Supabase's
+     Supavisor pooler accepts the TCP/protocol handshake into its own listener but then queues
+     waiting for a free session-mode backend slot rather than rejecting outright once the
+     underlying pool state gets murky — never confirmed with certainty, and not worth further
+     time once the real fix below existed anyway).
+  **The actual fix was eliminating the need for a second connection entirely**, not finding the
+  "right" one:
+  - Invoice numbering is now a real Postgres `SEQUENCE` (`invoice_number_seq`,
+    `prisma/migrations/20260824030000_invoice_number_sequence`, started at 5 to continue past the
+    4 real legacy-migrated invoices) — `nextval()` is a single atomic statement, safe under any
+    pooling mode, no transaction of any kind required. `createInvoice`/`duplicateInvoice` shrank
+    from a 5-attempt retry loop inside a SERIALIZABLE transaction to two lines.
+  - Every other interactive (callback-form) `$transaction(async (tx) => ...)` in the app —
+    `updateInvoice`/`deleteDraftInvoice`, `agents.ts`'s `assignCandidateToAgent`/`changeEmployer`,
+    `notifications.ts`'s contract-closure batch + databank-request approval — got restructured to
+    read any data it needed to decide what to write *before* the transaction (fine on the regular
+    pooled connection; all of these are low-frequency, human-driven actions, not a hot path where
+    a race would matter in practice), then execute the actual writes via the **array-batch** form
+    (`db.$transaction([queryA, queryB])`), which — unlike the callback form — Prisma sends as one
+    self-contained batch and IS safe under transaction-mode pooling. `runAsActor()` wraps the
+    whole batch call (not each query individually — the array form needs literal query-builder
+    expressions as its elements, not the result of another async wrapper), which correctly
+    threads the audit middleware's actor context per the same rules already established in
+    Phase 2/3/4's `AsyncLocalStorage` findings.
+  `DATABASE_URL` is back on the transaction-mode pooler (`?pgbouncer=true&connection_limit=1`) —
+  scales to many concurrent serverless instances, which is what actually matters for this
+  deployment target — and `dbDirect` was removed from `lib/db.ts` entirely rather than left as
+  unused, unreliable-under-Vercel infrastructure someone might reach for later.
+  **Verified live, repeatedly, against the actual production deployment** (not just a green
+  build): `web/scripts/verify-prod.mjs` (kept, `npm run verify:prod-login`) fires 5 concurrent
+  logins at `topway-mu.vercel.app` — all 5 succeed now, versus exhausting the connection pool
+  after the very first one at each of the two earlier broken configurations. `web/scripts/
+  verify-prod-invoice.mjs` (kept, `npm run verify:prod-invoice`, self-cleaning — deletes the test
+  invoice it creates once confirmed) creates a real invoice through the deployed app and confirms
+  the row actually exists in the database with the correct sequence-allocated number, run twice
+  to rule out a fluke.
+  **A real secret-exposure incident happened during this work and needs the user's action**: a
+  `grep` run to sanity-check `.env` after an edit printed the real Supabase database password to
+  this session's own tool output in plaintext. Rotation was attempted immediately via the
+  Supabase Management API (`PATCH /v1/projects/{ref}` with `db_pass` — undocumented in the public
+  API reference, found by trial; no CLI subcommand exists for this) — the call returned success
+  but the new password never actually took effect after two separate wait-and-recheck cycles
+  (~5+ minutes total, verified both directions with real `psql` connections each time, not
+  assumed). Stopped retrying rather than keep guessing at an unreliable API and flagged this to
+  the user directly: **the database password still needs manual rotation via the Supabase
+  dashboard** (Project Settings → Database → Reset Database Password) — `.env` and Vercel are
+  still on the original (now-exposed) password, which the app depends on until that's done, so
+  send the new one over once rotated and it gets wired into both places in one pass.
 
 ## Tech stack (exact)
 
@@ -632,7 +712,7 @@ under Phase 0 below — build the new one.
 - TanStack Query v5 for client data fetching
 - @react-pdf/renderer, server-side, for candidate profiles and invoices
 - Resend + React Email for notifications (still the local `.log` stand-in — not yet provisioned)
-- Deploy: Vercel + Supabase
+- Deploy: Vercel + Supabase — live at https://topway-mu.vercel.app
 
 ## Non-negotiable security rules
 

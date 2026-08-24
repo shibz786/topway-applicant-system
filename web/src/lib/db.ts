@@ -40,9 +40,10 @@ function currentActorId(): string | null {
   return actorContext.getStore()?.actorId ?? null;
 }
 
-function buildClient() {
+function buildClient(datasourceUrl?: string) {
   const client = new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    ...(datasourceUrl ? { datasources: { db: { url: datasourceUrl } } } : {}),
   });
 
   // Audit-log middleware: on every write to an audited model, capture a
@@ -156,3 +157,21 @@ export const db = globalThis.prismaGlobal ?? buildClient();
 if (process.env.NODE_ENV !== "production") {
   globalThis.prismaGlobal = db;
 }
+
+// A second client bound to a session-mode connection (for genuinely
+// interactive $transaction() calls) briefly existed here and was removed.
+// The app used to have several — invoice-number allocation, placement
+// reassignment, contract-closure notifications, databank approval — all
+// converted to either a single atomic statement (invoice numbers are now
+// a real Postgres SEQUENCE, see prisma/migrations/
+// 20260824030000_invoice_number_sequence) or an array-batch
+// $transaction([...]) with any conditional read moved to before the
+// transaction (safe: these are all low-frequency, human-driven actions,
+// not a hot path where a race would matter in practice). Both forms run
+// fine on `db` above (the transaction-mode pooler) — no second connection
+// needed at all. Don't reintroduce one without first checking whether the
+// same restructuring applies; a session-mode client was tried live on
+// Vercel first and, despite passing raw TCP connectivity checks, every
+// query through it just hung indefinitely with no error — never
+// conclusively diagnosed, and not worth revisiting unless a genuinely
+// unavoidable interactive transaction shows up.

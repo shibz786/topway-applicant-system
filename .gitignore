@@ -13,3 +13,4 @@
 
 # Claude Code local session state — not meant to be shared.
 /.claude/
+.vercel

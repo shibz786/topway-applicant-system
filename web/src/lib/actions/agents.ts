@@ -132,19 +132,28 @@ export async function assignCandidateToAgent(input: {
     if (!candidate) throw new ActionError("Candidate not found");
     if (!agent) throw new ActionError("Agent not found");
 
-    await db.$transaction(async (tx) => {
-      const current = await tx.placement.findFirst({ where: { candidateId, isCurrent: true } });
-      if (current) {
-        if (current.agentId === agentId) return; // already assigned here — no-op
-        await runAsActor(user, () =>
-          tx.placement.update({
-            where: { id: current.id },
-            data: { isCurrent: false, endDate: new Date(), changeReason: "Reassigned by admin/staff" },
-          }),
-        );
-      }
-      await runAsActor(user, () => tx.placement.create({ data: { candidateId, agentId } }));
-    });
+    // Read outside the transaction (fine on the regular pooled `db`
+    // client — this is a low-frequency, human-driven action, not a hot
+    // path where a race here would matter in practice), then batch the
+    // write(s) that decision implies. Array-batch, not the interactive
+    // callback form — see the long comment on the datasource block in
+    // schema.prisma for why that distinction matters.
+    const current = await db.placement.findFirst({ where: { candidateId, isCurrent: true } });
+    if (current?.agentId === agentId) return null; // already assigned here — no-op
+
+    await runAsActor(user, () =>
+      db.$transaction([
+        ...(current
+          ? [
+              db.placement.update({
+                where: { id: current.id },
+                data: { isCurrent: false, endDate: new Date(), changeReason: "Reassigned by admin/staff" },
+              }),
+            ]
+          : []),
+        db.placement.create({ data: { candidateId, agentId } }),
+      ]),
+    );
     return null;
   });
 }
@@ -189,33 +198,36 @@ export async function changeEmployer(input: ChangeEmployerInput): Promise<Action
     if (!candidate) throw new ActionError("Candidate not found");
     if (!newAgent) throw new ActionError("Agent not found");
 
-    await db.$transaction(async (tx) => {
-      const current = await tx.placement.findFirst({
-        where: { candidateId: data.candidateId, isCurrent: true },
-      });
-      if (current) {
-        await runAsActor(user, () =>
-          tx.placement.update({
-            where: { id: current.id },
-            data: {
-              isCurrent: false,
-              endDate: new Date(),
-              changeReason: data.changeReason,
-              remarketingDate: data.grantRemarketing ? new Date() : null,
-            },
-          }),
-        );
-      }
-      await runAsActor(user, () =>
-        tx.placement.create({
+    // Same read-outside-then-batch pattern as assignCandidateToAgent()
+    // above — see its comment for why.
+    const current = await db.placement.findFirst({
+      where: { candidateId: data.candidateId, isCurrent: true },
+    });
+
+    await runAsActor(user, () =>
+      db.$transaction([
+        ...(current
+          ? [
+              db.placement.update({
+                where: { id: current.id },
+                data: {
+                  isCurrent: false,
+                  endDate: new Date(),
+                  changeReason: data.changeReason,
+                  remarketingDate: data.grantRemarketing ? new Date() : null,
+                },
+              }),
+            ]
+          : []),
+        db.placement.create({
           data: {
             candidateId: data.candidateId,
             agentId: data.newAgentId,
             employerName: data.employerName || null,
           },
         }),
-      );
-    });
+      ]),
+    );
     return null;
   });
 }

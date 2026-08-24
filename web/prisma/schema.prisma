@@ -7,24 +7,48 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // DATABASE_URL: Supabase's SESSION-mode pooler (port 5432 via the
-  // pooler host) — what the app queries through at runtime. Deliberately
-  // NOT the transaction-mode pooler (port 6543): invoices.ts's sequential-
-  // numbering logic uses a real interactive $transaction() with SERIALIZABLE
-  // isolation, and PgBouncer's transaction-pooling mode can route different
-  // statements within one "transaction" to different backend connections —
-  // which silently breaks that guarantee (confirmed live: createInvoice
-  // returned success and navigated to the new invoice's page, but the row
-  // was never actually there). Session mode keeps one backend connection
-  // per client for the session's duration, so interactive transactions and
-  // prepared statements work exactly like a direct connection, while still
-  // being pooled/IPv4-friendly. If this ever needs to move to transaction-
-  // mode pooling for higher concurrency (many serverless cold-starts), the
-  // $transaction blocks would need to run against a second client bound to
-  // DIRECT_URL instead — don't just flip DATABASE_URL back to port 6543.
+  // DATABASE_URL: Supabase's TRANSACTION-mode pooler (port 6543,
+  // ?pgbouncer=true&connection_limit=1) — what `db` (lib/db.ts) queries
+  // through for everything, full stop. Getting here took three live
+  // iterations, each a real failure caught by actually exercising the
+  // deployed app, not by reasoning about it:
+  //   1. Started on session-mode pooling (port 5432) because PgBouncer's
+  //      transaction mode can route different statements within one
+  //      logical $transaction() to different backend connections, which
+  //      silently broke invoice-number allocation's interactive
+  //      transaction — createInvoice reported success and navigated to
+  //      the new invoice's page, but the row was never actually written.
+  //   2. Session mode fixed that, but broke under real Vercel traffic:
+  //      each serverless instance holds one dedicated connection for its
+  //      whole lifetime in session mode, and its connection budget is
+  //      much smaller (this project: capped at 15) — the very first
+  //      login succeeded, every one after it failed with "FATAL: max
+  //      clients reached in session mode".
+  //   3. Tried a second client on a session-mode connection, used only
+  //      for the app's handful of genuinely interactive transactions
+  //      (rare enough that #2's budget shouldn't matter). Raw TCP
+  //      connectivity checked out fine, but every actual query through it
+  //      just hung indefinitely with no error at all — never
+  //      conclusively diagnosed.
+  // The real fix was removing the need for a second connection entirely:
+  // invoice numbers are now a Postgres SEQUENCE (single atomic statement,
+  // see prisma/migrations/20260824030000_invoice_number_sequence) instead
+  // of a read-then-write-with-retry transaction, and every other
+  // interactive (callback-form) $transaction() in the app got restructured
+  // to an array-batch $transaction([...]) with any conditional read moved
+  // to before it — batch transactions ARE safe under transaction-mode
+  // pooling, unlike the callback form. See lib/db.ts's comment where
+  // `dbDirect` used to be for the full list of what got restructured.
+  // Don't add a NEW interactive $transaction(async (tx) => ...) callback
+  // anywhere in this app without reading that comment first.
   url = env("DATABASE_URL")
-  // DIRECT_URL: Supabase's true direct (non-pooled) connection. Prisma
-  // Migrate uses this specifically, independent of the above.
+  // DIRECT_URL: Supabase's true direct (non-pooled) connection
+  // (?connection_limit=1, for the same per-instance-cap reason as above).
+  // Used ONLY by `prisma migrate`, run from a real machine — Supabase's
+  // direct connection is IPv6-only, which Vercel's serverless network
+  // can't reach at all (confirmed live: DNS resolution for
+  // db.<ref>.supabase.co fails outright from a Vercel function), so this
+  // must never be reached by the running app itself.
   directUrl = env("DIRECT_URL")
 }
 

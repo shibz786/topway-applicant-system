@@ -103,15 +103,19 @@ export async function listCandidatesForInvoice(): Promise<
 }
 
 // Sequential invoice numbers, generated server-side (never client-supplied)
-// — a serializable transaction with a bounded retry handles the race
-// between two concurrent creates without needing a dedicated counter table.
-async function nextInvoiceNumber(tx: Prisma.TransactionClient): Promise<string> {
-  const invoices = await tx.invoice.findMany({ select: { number: true } });
-  const max = invoices.reduce((acc, inv) => {
-    const n = parseInt(inv.number, 10);
-    return Number.isFinite(n) && n > acc ? n : acc;
-  }, 0);
-  return String(max + 1).padStart(2, "0");
+// — a real Postgres SEQUENCE (see prisma/migrations/
+// 20260824030000_invoice_number_sequence), not a MAX(number)+1 read
+// wrapped in an interactive transaction like this used to be. That
+// approach was correct in principle but needs a connection pool that can
+// hold one connection across multiple round-trips, and neither of
+// Supabase's pooler modes gave this app both that AND the connection
+// headroom to survive many concurrent Vercel serverless instances (full
+// story in the datasource block comment in schema.prisma). nextval() is a
+// single atomic statement — safe on the regular pooled `db` client, no
+// transaction or retry loop needed at all.
+async function nextInvoiceNumber(): Promise<string> {
+  const [{ nextval }] = await db.$queryRaw<{ nextval: bigint }[]>`SELECT nextval('invoice_number_seq')`;
+  return String(nextval).padStart(2, "0");
 }
 
 function totalFromItems(items: InvoiceFormInput["items"]): number {
@@ -127,54 +131,30 @@ export async function createInvoice(input: InvoiceFormInput): Promise<ActionResu
     if (!parsed.success) throw new ActionError(parsed.error.issues[0]?.message ?? "Invalid input");
     const data = parsed.data;
 
-    // actorContext.run() is wrapped around each individual query INSIDE the
-    // transaction callback, not around the whole db.$transaction(...) call.
-    // AsyncLocalStorage's store does not reliably survive being entered
-    // outside and read from inside Prisma's interactive-transaction
-    // callback (its Rust query engine bridge appears to resume the
-    // continuation off the tracked async chain) — confirmed by actually
-    // running this against the dev DB, where the audit middleware's own
-    // "no actor in context" guard caught it. Wrapping inside the callback,
-    // right around the write, is what actually keeps the context intact.
-    return db.$transaction(
-      async (tx) => {
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const number = await nextInvoiceNumber(tx);
-          try {
-            const invoice = await runAsActor(user, () =>
-              tx.invoice.create({
-                data: {
-                  number,
-                  status: "DRAFT",
-                  agentId: data.agentId || null,
-                  totalAmount: totalFromItems(data.items),
-                  currency: data.currency,
-                  notes: data.notes || null,
-                  issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
-                  dueAt: data.dueAt ? new Date(data.dueAt) : null,
-                  items: {
-                    create: data.items.map((item) => ({
-                      candidateId: item.candidateId || null,
-                      description: item.description,
-                      amount: item.amount,
-                      quantity: item.quantity,
-                    })),
-                  },
-                },
-              }),
-            );
-            return { id: invoice.id };
-          } catch (err) {
-            if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-              continue; // number collided with a concurrent create — retry with a fresh max
-            }
-            throw err;
-          }
-        }
-        throw new ActionError("Could not allocate an invoice number — please try again");
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    const number = await nextInvoiceNumber();
+    const invoice = await runAsActor(user, () =>
+      db.invoice.create({
+        data: {
+          number,
+          status: "DRAFT",
+          agentId: data.agentId || null,
+          totalAmount: totalFromItems(data.items),
+          currency: data.currency,
+          notes: data.notes || null,
+          issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
+          dueAt: data.dueAt ? new Date(data.dueAt) : null,
+          items: {
+            create: data.items.map((item) => ({
+              candidateId: item.candidateId || null,
+              description: item.description,
+              amount: item.amount,
+              quantity: item.quantity,
+            })),
+          },
+        },
+      }),
     );
+    return { id: invoice.id };
   });
 }
 
@@ -193,12 +173,17 @@ export async function updateInvoice(id: string, input: InvoiceFormInput): Promis
       throw new ActionError("Only draft invoices can be edited — void and recreate instead");
     }
 
-    // See the long comment in createInvoice() above — actorContext.run()
-    // has to wrap the write itself, inside the transaction callback.
-    await db.$transaction(async (tx) => {
-      await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
-      await runAsActor(user, () =>
-        tx.invoice.update({
+    // Array-batch form, not the interactive callback form — the two writes
+    // don't depend on reading anything back mid-transaction, so this
+    // doesn't need dbDirect (see the long comment on the datasource block
+    // in schema.prisma for why that distinction matters here). Wrapping
+    // the whole batch in runAsActor() — not each query individually —
+    // because $transaction([...]) needs literal query-builder expressions
+    // as its array elements, not the result of another async wrapper.
+    await runAsActor(user, () =>
+      db.$transaction([
+        db.invoiceItem.deleteMany({ where: { invoiceId: id } }),
+        db.invoice.update({
           where: { id },
           data: {
             agentId: data.agentId || null,
@@ -217,8 +202,8 @@ export async function updateInvoice(id: string, input: InvoiceFormInput): Promis
             },
           },
         }),
-      );
-    });
+      ]),
+    );
     return null;
   });
 }
@@ -231,41 +216,28 @@ export async function duplicateInvoice(id: string): Promise<ActionResult<{ id: s
     const source = await getInvoiceInternal(id);
     if (!source) throw new ActionError("Invoice not found");
 
-    return db.$transaction(
-      async (tx) => {
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const number = await nextInvoiceNumber(tx);
-          try {
-            const created = await runAsActor(user, () =>
-              tx.invoice.create({
-                data: {
-                  number,
-                  status: "DRAFT",
-                  agentId: source.agentId,
-                  totalAmount: source.totalAmount,
-                  currency: source.currency,
-                  notes: source.notes,
-                  items: {
-                    create: source.items.map((item) => ({
-                      candidateId: item.candidateId,
-                      description: item.description,
-                      amount: item.amount,
-                      quantity: item.quantity,
-                    })),
-                  },
-                },
-              }),
-            );
-            return { id: created.id };
-          } catch (err) {
-            if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
-            throw err;
-          }
-        }
-        throw new ActionError("Could not allocate an invoice number — please try again");
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    const number = await nextInvoiceNumber();
+    const created = await runAsActor(user, () =>
+      db.invoice.create({
+        data: {
+          number,
+          status: "DRAFT",
+          agentId: source.agentId,
+          totalAmount: source.totalAmount,
+          currency: source.currency,
+          notes: source.notes,
+          items: {
+            create: source.items.map((item) => ({
+              candidateId: item.candidateId,
+              description: item.description,
+              amount: item.amount,
+              quantity: item.quantity,
+            })),
+          },
+        },
+      }),
     );
+    return { id: created.id };
   });
 }
 
@@ -317,13 +289,12 @@ export async function deleteDraftInvoice(id: string): Promise<ActionResult<null>
       throw new ActionError("Only draft invoices can be deleted — void it instead");
     }
 
-    // Interactive form, not the array-batch form — see the comment in
-    // createInvoice() above about actorContext needing to wrap the write
-    // from inside the transaction callback.
-    await db.$transaction(async (tx) => {
-      await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
-      await runAsActor(user, () => tx.invoice.delete({ where: { id } }));
-    });
+    // Array-batch form — see the comment in updateInvoice() above, same
+    // reasoning applies here (no read-then-conditional-write dependency
+    // between the two statements, so this doesn't need dbDirect).
+    await runAsActor(user, () =>
+      db.$transaction([db.invoiceItem.deleteMany({ where: { invoiceId: id } }), db.invoice.delete({ where: { id } })]),
+    );
     return null;
   });
 }

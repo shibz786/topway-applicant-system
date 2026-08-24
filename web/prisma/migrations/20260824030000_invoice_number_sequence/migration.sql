@@ -1,0 +1,16 @@
+-- Invoice numbering, take 2. Previously an interactive $transaction()
+-- reading MAX(number)+1 with a retry-on-collision loop (SERIALIZABLE
+-- isolation) — correct in principle, but every such interactive
+-- transaction needs a connection pool that supports holding one
+-- connection across multiple round-trips, and neither of Supabase's
+-- pooler modes turned out to give the app both that AND the connection
+-- headroom to survive many concurrent Vercel serverless instances (see
+-- the long comment on the datasource block in schema.prisma for the full
+-- story). A Postgres SEQUENCE sidesteps the whole problem: nextval() is a
+-- single atomic statement, safe on ANY pooling mode, no transaction of any
+-- kind required.
+--
+-- Started at 5 (nextval will return 5) because 4 real invoices (01-04)
+-- already exist from the legacy migration — never START at 1 here, or the
+-- first new invoice created would collide with an existing number.
+CREATE SEQUENCE IF NOT EXISTS "invoice_number_seq" START 5;

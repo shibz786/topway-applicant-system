@@ -81,7 +81,10 @@ await page.getByRole("button", { name: "Create invoice" }).click();
 // match the literal word "new" (it's all lowercase a-z), so a premature
 // read silently produced a bogus /api/invoices/new/pdf URL for the PDF
 // check further down instead of failing loudly here.
-await page.waitForURL(/\/invoices\/(?!new$)[a-z0-9]+$/, { timeout: 10000 }).catch(() => {});
+// 10s wasn't enough once every DB query is a real network round-trip to
+// Supabase instead of localhost (true for every environment this now
+// runs in, not just prod) — bumped rather than chasing a lower number.
+await page.waitForURL(/\/invoices\/(?!new$)[a-z0-9]+$/, { timeout: 20000 }).catch(() => {});
 const afterCreateUrl = page.url();
 check("invoice created, navigated to its detail page", /\/invoices\/(?!new$)[a-z0-9]+$/.test(afterCreateUrl));
 
