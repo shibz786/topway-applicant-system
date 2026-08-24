@@ -121,6 +121,13 @@ model Agent {
   logoR2Key      String?
   dataBankAccess Boolean     @default(false)
   placements     Placement[]
+  // Neither legacy data.json nor the original schema tracked these — the
+  // Blacklist portal needed a real license/contact number to show per
+  // agent (not just company name), so these are new, nullable since no
+  // existing agent record has ever had one on file. licenseNo is a plain
+  // free-text field, not tied to any specific registry format.
+  licenseNo      String?
+  contactNo      String?
 }
 
 model Candidate {

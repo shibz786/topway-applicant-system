@@ -38,6 +38,8 @@ export type BlacklistDisputeEntry = {
   resolvedAt: Date | null;
   agentName: string | null;
   agentCountry: string | null;
+  agentLicenseNo: string | null;
+  agentContactNo: string | null;
 };
 
 export type BlacklistEntry = {
@@ -65,7 +67,7 @@ async function listBlacklistInternal(): Promise<BlacklistEntry[]> {
             select: {
               startDate: true,
               endDate: true,
-              agent: { select: { companyName: true, country: true } },
+              agent: { select: { companyName: true, country: true, licenseNo: true, contactNo: true } },
             },
           },
         },
@@ -105,6 +107,8 @@ async function listBlacklistInternal(): Promise<BlacklistEntry[]> {
       resolvedAt: d.resolvedAt,
       agentName: placement?.agent.companyName ?? null,
       agentCountry: placement?.agent.country ?? null,
+      agentLicenseNo: placement?.agent.licenseNo ?? null,
+      agentContactNo: placement?.agent.contactNo ?? null,
     });
     byCandidate.set(c.id, entry);
   }

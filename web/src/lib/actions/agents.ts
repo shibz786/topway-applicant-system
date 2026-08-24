@@ -65,6 +65,8 @@ export async function createAgent(input: CreateAgentInput): Promise<ActionResult
           create: {
             companyName: data.companyName,
             country: data.country,
+            licenseNo: data.licenseNo || null,
+            contactNo: data.contactNo || null,
             dataBankAccess: data.dataBankAccess,
           },
         },
@@ -102,7 +104,13 @@ export async function updateAgent(input: UpdateAgentInput): Promise<ActionResult
       }),
       db.agent.update({
         where: { id: data.id },
-        data: { companyName: data.companyName, country: data.country, dataBankAccess: data.dataBankAccess },
+        data: {
+          companyName: data.companyName,
+          country: data.country,
+          licenseNo: data.licenseNo || null,
+          contactNo: data.contactNo || null,
+          dataBankAccess: data.dataBankAccess,
+        },
       }),
     ]);
     return null;

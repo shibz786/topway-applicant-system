@@ -6,6 +6,8 @@ export const createAgentSchema = z.object({
   name: z.string().trim().min(1, "Contact name is required").max(200),
   companyName: z.string().trim().min(1, "Company name is required").max(200),
   country: z.string().trim().min(1, "Country is required").max(100),
+  licenseNo: z.string().trim().max(100).optional(),
+  contactNo: z.string().trim().max(50).optional(),
   username: z
     .string()
     .trim()
@@ -24,6 +26,8 @@ export const updateAgentSchema = z.object({
   name: z.string().trim().min(1, "Contact name is required").max(200),
   companyName: z.string().trim().min(1, "Company name is required").max(200),
   country: z.string().trim().min(1, "Country is required").max(100),
+  licenseNo: z.string().trim().max(100).optional(),
+  contactNo: z.string().trim().max(50).optional(),
   email: z.email("Enter a valid email"),
   password: z.union([z.literal(""), z.string().min(8, "At least 8 characters").max(200)]).optional(),
   dataBankAccess: z.boolean(),

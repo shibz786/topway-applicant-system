@@ -62,6 +62,38 @@ export function BlacklistTable() {
   );
 }
 
+// Bottom-right of each dispute listing: which agent handled this candidate
+// at the time, plus how to reach/verify them — the whole point of the
+// portal per CLAUDE.md ("which agent handled the candidate... can help
+// licence holders share information, support each other"). License/contact
+// number are blank on older placements whose agent record predates these
+// fields, not a bug.
+function AgentAttribution({
+  name,
+  country,
+  licenseNo,
+  contactNo,
+}: {
+  name: string | null;
+  country: string | null;
+  licenseNo: string | null;
+  contactNo: string | null;
+}) {
+  if (!name) {
+    return <span className="text-xs text-muted-foreground">No agent on record</span>;
+  }
+  return (
+    <div className="text-xs">
+      <p className="font-medium text-foreground">
+        {name}
+        {country ? ` (${country})` : ""}
+      </p>
+      <p className="text-muted-foreground">License no: {licenseNo || "-"}</p>
+      <p className="text-muted-foreground">Contact no: {contactNo || "-"}</p>
+    </div>
+  );
+}
+
 function BlacklistCard({ entry }: { entry: BlacklistEntry }) {
   return (
     <Card className="gap-0 overflow-hidden p-0">
@@ -95,16 +127,18 @@ function BlacklistCard({ entry }: { entry: BlacklistEntry }) {
                 )}
               </div>
               {d.notes && <p className="mt-0.5 text-xs text-muted-foreground">{d.notes}</p>}
-              <p className="mt-1 text-xs text-muted-foreground">
-                Handled by{" "}
-                <span className="font-medium text-foreground">
-                  {d.agentName ? `${d.agentName}${d.agentCountry ? ` (${d.agentCountry})` : ""}` : "no agent on record"}
-                </span>
-              </p>
             </div>
-            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-              {new Date(d.createdAt).toLocaleDateString()}
-            </span>
+            <div className="flex shrink-0 flex-col items-end gap-1 text-right">
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {new Date(d.createdAt).toLocaleDateString()}
+              </span>
+              <AgentAttribution
+                name={d.agentName}
+                country={d.agentCountry}
+                licenseNo={d.agentLicenseNo}
+                contactNo={d.agentContactNo}
+              />
+            </div>
           </div>
         ))}
       </div>

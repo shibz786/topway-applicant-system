@@ -61,6 +61,7 @@ export function AgentManager() {
             <TableRow>
               <TableHead>Company</TableHead>
               <TableHead>Contact</TableHead>
+              <TableHead>License no</TableHead>
               <TableHead>Country</TableHead>
               <TableHead>Assigned</TableHead>
               <TableHead>Databank Access</TableHead>
@@ -71,7 +72,7 @@ export function AgentManager() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   Loading…
                 </TableCell>
               </TableRow>
@@ -81,7 +82,9 @@ export function AgentManager() {
                 <TableCell className="font-medium">{a.companyName}</TableCell>
                 <TableCell>
                   {a.user.name} ({a.user.username})
+                  {a.contactNo && <div className="text-xs text-muted-foreground">{a.contactNo}</div>}
                 </TableCell>
+                <TableCell>{a.licenseNo || "-"}</TableCell>
                 <TableCell>{a.country}</TableCell>
                 <TableCell>{a._count.placements}</TableCell>
                 <TableCell>{a.dataBankAccess ? <Badge variant="secondary">Yes</Badge> : "-"}</TableCell>
@@ -140,6 +143,8 @@ function CreateAgentForm({ onSuccess }: { onSuccess: () => void }) {
       name: "",
       companyName: "",
       country: "",
+      licenseNo: "",
+      contactNo: "",
       username: "",
       email: "",
       password: "",
@@ -171,6 +176,12 @@ function CreateAgentForm({ onSuccess }: { onSuccess: () => void }) {
         </F>
         <F label="Country" error={errors.country?.message}>
           <Input {...register("country")} />
+        </F>
+        <F label="License no" error={errors.licenseNo?.message}>
+          <Input {...register("licenseNo")} />
+        </F>
+        <F label="Contact no" error={errors.contactNo?.message}>
+          <Input {...register("contactNo")} />
         </F>
         <F label="Username" error={errors.username?.message}>
           <Input {...register("username")} />
@@ -212,6 +223,8 @@ function EditAgentForm({ agent, onSuccess }: { agent: AgentRow; onSuccess: () =>
       name: agent.user.name,
       companyName: agent.companyName,
       country: agent.country,
+      licenseNo: agent.licenseNo ?? "",
+      contactNo: agent.contactNo ?? "",
       email: agent.user.email,
       password: "",
       dataBankAccess: agent.dataBankAccess,
@@ -243,6 +256,12 @@ function EditAgentForm({ agent, onSuccess }: { agent: AgentRow; onSuccess: () =>
         </F>
         <F label="Country" error={errors.country?.message}>
           <Input {...register("country")} />
+        </F>
+        <F label="License no" error={errors.licenseNo?.message}>
+          <Input {...register("licenseNo")} />
+        </F>
+        <F label="Contact no" error={errors.contactNo?.message}>
+          <Input {...register("contactNo")} />
         </F>
         <F label="Email" error={errors.email?.message}>
           <Input type="email" {...register("email")} />

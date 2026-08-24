@@ -773,6 +773,25 @@ under Phase 0 below — build the new one.
   wrapped to two lines — widened that one column (78%/22% instead of 84%/16%) rather than leaving
   a visual defect uncaught by typecheck. Test invoices and the verification script were deleted
   after confirming correctness, not left as clutter.
+- **Agent License no / Contact no — done.** The user asked for the Blacklist portal's bottom-right
+  attribution block to show Agent name, License no, and Contact no. Neither field existed anywhere
+  in the schema or the legacy data (`data/agents.json` has no license/phone field for any agent) —
+  these are genuinely new, not a rebuild of something legacy had. Added `Agent.licenseNo` /
+  `Agent.contactNo` (both nullable `String`, migration applied live against Supabase), wired into
+  the create/edit agent form (`agent-manager.tsx`) and the agents table (`/admin/agents`), and
+  threaded through `listBlacklist()` (`lib/actions/blacklist.ts`) into a new `AgentAttribution`
+  block in `blacklist-table.tsx`, right-aligned under each dispute listing's date, below "Handled
+  by" (replacing the old inline text version). Blank on any placement whose agent record predates
+  these fields — expected, not a bug.
+  **Verified live**: set test values on two real agents, screenshotted the Blacklist portal and
+  confirmed both the populated case (name, License no, Contact no all showing) and the blank case
+  (dashes, not blank space) render correctly, plus the agents list/edit dialog. One dev-only false
+  alarm caught and correctly diagnosed rather than "fixed" blind: the blacklist page appeared stuck
+  on loading skeletons for several seconds on every check — turned out to be genuine
+  dev-to-Singapore-Supabase round-trip latency (server logs showed the same request completing in
+  4-10s), not a bug, once the verification script waited for the skeleton to actually detach
+  instead of a fixed timeout. Test license/contact values and the throwaway screenshot scripts
+  were removed after confirming correctness.
 
 ## Tech stack (exact)
 
