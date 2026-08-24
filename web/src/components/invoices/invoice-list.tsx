@@ -57,6 +57,26 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// Matches invoice.html's own "Advance" states (None isn't shown at all,
+// same as legacy's calculator omitting an empty advance row entirely).
+function AdvanceBadge({ status }: { status: string }) {
+  if (status === "PAID") {
+    return (
+      <Badge className="border-0 bg-critical/15 text-critical">
+        Advance paid
+      </Badge>
+    );
+  }
+  if (status === "REQUESTED") {
+    return (
+      <Badge className="border-0 bg-warn/15 text-warn">
+        Advance requested
+      </Badge>
+    );
+  }
+  return null;
+}
+
 export function InvoiceList() {
   const queryClient = useQueryClient();
   const [pendingStatusChange, setPendingStatusChange] = useState<{
@@ -127,7 +147,8 @@ export function InvoiceList() {
           <TableRow>
             <TableHead>Number</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Total</TableHead>
+            <TableHead>Amount due</TableHead>
+            <TableHead>Advance</TableHead>
             <TableHead>Issued</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -135,14 +156,14 @@ export function InvoiceList() {
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           )}
           {data?.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
                 No invoices yet.
               </TableCell>
             </TableRow>
@@ -165,7 +186,15 @@ export function InvoiceList() {
                   <StatusBadge status={inv.status} />
                 </TableCell>
                 <TableCell>
-                  {inv.currency} {inv.totalAmount.toLocaleString()}
+                  {inv.currency} {inv.amountDue.toLocaleString()}
+                  {inv.amountDue !== inv.totalAmount && (
+                    <span className="ml-1.5 text-xs text-muted-foreground line-through">
+                      {inv.totalAmount.toLocaleString()}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <AdvanceBadge status={inv.advanceStatus} />
                 </TableCell>
                 <TableCell>
                   {inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : "-"}

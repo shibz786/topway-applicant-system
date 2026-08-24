@@ -13,7 +13,7 @@ import {
   listAgentsForInvoice,
   listCandidatesForInvoice,
 } from "@/lib/actions/invoices";
-import { invoiceFormSchema, type InvoiceFormInput } from "@/lib/validation/invoice";
+import { invoiceFormSchema, ADVANCE_STATUSES, type InvoiceFormInput } from "@/lib/validation/invoice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +60,7 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
     control,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<InvoiceFormInput>({
     resolver: zodResolver(invoiceFormSchema),
@@ -70,6 +71,8 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
       issuedAt: new Date().toISOString().slice(0, 10),
       dueAt: "",
       items: [EMPTY_ITEM],
+      advanceStatus: "NONE",
+      advanceAmount: 0,
     },
   });
 
@@ -90,16 +93,61 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
           amount: i.amount,
           quantity: i.quantity,
         })),
+        advanceStatus: (existing.advanceStatus as InvoiceFormInput["advanceStatus"]) ?? "NONE",
+        advanceAmount: existing.advanceAmount ?? 0,
       });
     }
   }, [existing, reset]);
 
+  // Live preview, matching the legacy calculator (invoice.html's
+  // "Calculated Total" bar) — an advance only reduces what's shown as due
+  // once it's actually PAID, not merely requested.
+  const watchedItems = watch("items");
+  const watchedAdvanceStatus = watch("advanceStatus");
+  const watchedAdvanceAmount = watch("advanceAmount");
+  const watchedCurrency = watch("currency");
+  const subtotal = (watchedItems ?? []).reduce((sum, i) => sum + (i.amount || 0) * (i.quantity || 0), 0);
+  const amountDue = watchedAdvanceStatus === "PAID" ? subtotal - (watchedAdvanceAmount || 0) : subtotal;
+
   if (isEdit && existing && existing.status !== "DRAFT") {
     return (
       <Card>
-        <CardContent className="p-6 text-sm text-muted-foreground">
-          Invoice #{existing.number} is {existing.status.toLowerCase()} and can no longer be edited.
-          Use Duplicate from the list to create a new draft based on it.
+        <CardHeader>
+          <CardTitle>Invoice #{existing.number}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            This invoice is {existing.status.toLowerCase()} and can no longer be edited. Use
+            Duplicate from the list to create a new draft based on it.
+          </p>
+          <div className="space-y-1 text-sm">
+            {existing.items.map((item) => (
+              <div key={item.id} className="flex justify-between">
+                <span>
+                  {item.description} × {item.quantity}
+                </span>
+                <span>
+                  {existing.currency} {(item.amount * item.quantity).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+          {existing.advanceStatus !== "NONE" && existing.advanceAmount !== null && (
+            <div className="flex justify-between border-t pt-2 text-sm">
+              <span className="text-muted-foreground">
+                {existing.advanceStatus === "PAID" ? "Advance paid" : "Advance requested"}
+              </span>
+              <span>
+                {existing.currency} {existing.advanceAmount.toLocaleString()}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between border-t pt-2 text-base font-medium">
+            <span>Amount due</span>
+            <span>
+              {existing.currency} {existing.amountDue.toLocaleString()}
+            </span>
+          </div>
         </CardContent>
       </Card>
     );
@@ -242,6 +290,54 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
           <Button type="button" variant="outline" size="sm" onClick={() => append(EMPTY_ITEM)}>
             + Add line item
           </Button>
+
+          <div className="flex flex-wrap items-end justify-between gap-3 rounded-md border p-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Advance</Label>
+                <Controller
+                  control={control}
+                  name="advanceStatus"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ADVANCE_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s === "NONE" ? "None" : s === "REQUESTED" ? "Requested" : "Paid"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Advance amount</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  disabled={watchedAdvanceStatus === "NONE"}
+                  {...register("advanceAmount", { valueAsNumber: true })}
+                />
+                {errors.advanceAmount && <p className="text-sm text-destructive">{errors.advanceAmount.message}</p>}
+              </div>
+            </div>
+            <div className="space-y-0.5 text-right text-sm">
+              {watchedAdvanceStatus === "PAID" && (watchedAdvanceAmount || 0) > 0 && (
+                <p className="text-muted-foreground">
+                  Subtotal {watchedCurrency} {subtotal.toFixed(2)}, less advance paid {watchedCurrency}{" "}
+                  {(watchedAdvanceAmount || 0).toFixed(2)}
+                </p>
+              )}
+              <p className="font-medium">
+                Amount due: {watchedCurrency} {amountDue.toFixed(2)}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

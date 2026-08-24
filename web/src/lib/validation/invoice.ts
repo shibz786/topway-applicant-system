@@ -28,14 +28,27 @@ const invoiceItemSchema = z.object({
   quantity: z.number().int().min(1, "At least 1"),
 });
 
-export const invoiceFormSchema = z.object({
-  agentId: z.string().nullable().optional(),
-  currency: z.string().trim().min(1).max(10),
-  notes: z.string().trim().max(5000).optional(),
-  issuedAt: z.string().optional(), // yyyy-mm-dd from a date input
-  dueAt: z.string().optional(),
-  items: z.array(invoiceItemSchema).min(1, "At least one line item is required"),
-});
+// A real legacy feature (invoice.html's "Advance" row: a None/Requested/
+// Paid select plus an amount) — see the comment on Invoice.advanceStatus
+// in schema.prisma for the full story of why it wasn't built until now.
+export const ADVANCE_STATUSES = ["NONE", "REQUESTED", "PAID"] as const;
+export type AdvanceStatus = (typeof ADVANCE_STATUSES)[number];
+
+export const invoiceFormSchema = z
+  .object({
+    agentId: z.string().nullable().optional(),
+    currency: z.string().trim().min(1).max(10),
+    notes: z.string().trim().max(5000).optional(),
+    issuedAt: z.string().optional(), // yyyy-mm-dd from a date input
+    dueAt: z.string().optional(),
+    items: z.array(invoiceItemSchema).min(1, "At least one line item is required"),
+    advanceStatus: z.enum(ADVANCE_STATUSES),
+    advanceAmount: z.number().nonnegative("Must be 0 or more"),
+  })
+  .refine((data) => data.advanceStatus === "NONE" || data.advanceAmount > 0, {
+    message: "Enter an advance amount",
+    path: ["advanceAmount"],
+  });
 
 export type InvoiceFormInput = z.infer<typeof invoiceFormSchema>;
 

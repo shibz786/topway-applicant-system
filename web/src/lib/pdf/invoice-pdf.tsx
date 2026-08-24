@@ -115,6 +115,18 @@ const styles = StyleSheet.create({
   tdQty: { padding: "6.75 10.5", fontSize: 9, color: "#555555", textAlign: "center" },
   tdTotal: { padding: "6.75 10.5", fontSize: 9.4, fontWeight: 700, color: "#274650", textAlign: "right" },
 
+  // Subtotal + advance rows — exact port of invoice.html's advanceHtml
+  // block (only inserted when advance.status is requested/paid and an
+  // amount is set; "None" renders nothing at all, same as legacy).
+  subtotalRow: { flexDirection: "row", backgroundColor: "#f0f4f6", borderTopWidth: 1.5, borderTopColor: "#d0dde3", borderBottomWidth: 0.75, borderBottomColor: "#dce8ed" },
+  subtotalLabel: { padding: "6.75 10.5", fontSize: 8.6, fontWeight: 700, color: "#555555", textAlign: "right", textTransform: "uppercase", letterSpacing: 0.4 },
+  subtotalValue: { padding: "6.75 10.5", fontSize: 9.4, fontWeight: 700, color: "#274650", textAlign: "right" },
+  advanceRow: { flexDirection: "row", backgroundColor: "#fff8f0", borderBottomWidth: 0.75, borderBottomColor: "#f0ddd9" },
+  advanceLabelRequested: { padding: "6.75 10.5", fontSize: 8.6, fontWeight: 600, color: "#9A7D0A", textAlign: "right", textTransform: "uppercase", letterSpacing: 0.4 },
+  advanceLabelPaid: { padding: "6.75 10.5", fontSize: 8.6, fontWeight: 600, color: "#c0392b", textAlign: "right", textTransform: "uppercase", letterSpacing: 0.4 },
+  advanceValueRequested: { padding: "6.75 10.5", fontSize: 9.4, fontWeight: 700, color: "#9A7D0A", textAlign: "right" },
+  advanceValuePaid: { padding: "6.75 10.5", fontSize: 9.4, fontWeight: 700, color: "#c0392b", textAlign: "right" },
+
   footerRow: { flexDirection: "row", marginTop: 7.5 },
   bankCol: { width: "55%", paddingRight: 15, justifyContent: "flex-end" },
   bankName: { fontSize: 9, fontWeight: 800, color: "#1a2b35", marginBottom: 3.75 },
@@ -156,11 +168,20 @@ export type InvoiceForPdf = {
   issuedAt: Date | null;
   dueAt: Date | null;
   items: { id: string; description: string; amount: Prisma.Decimal | number; quantity: number }[];
+  // Legacy invoice.html's "Advance" row (None/Requested/Paid + amount) —
+  // see the comment on Invoice.advanceStatus in schema.prisma.
+  advanceStatus: string;
+  advanceAmount: Prisma.Decimal | number | null;
 };
 
 function fmtAmount(v: Prisma.Decimal | number): string {
   const n = typeof v === "number" ? v : v.toNumber();
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function toNum(v: Prisma.Decimal | number | null): number {
+  if (v === null) return 0;
+  return typeof v === "number" ? v : v.toNumber();
 }
 
 function fmtDate(d: Date | null): string {
@@ -208,6 +229,19 @@ export function InvoicePdfDocument({
     (footer?.address || company.address) && `Address: ${footer?.address || company.address}`,
   ].filter(Boolean) as string[];
   const website = footer?.website || company.website || "";
+
+  // Subtotal + advance rows only appear when the advance was actually
+  // requested or paid with a real amount — matches invoice.html's
+  // advanceHtml block exactly (a "None" advance renders nothing). The big
+  // Amount box below reflects what's actually owed: the raw item subtotal
+  // minus the advance, but only once it's PAID — a merely REQUESTED
+  // advance is a note to the reader, not a reduction (same rule as
+  // computeAmountDue() in lib/actions/invoices.ts).
+  const workersSum = invoice.items.reduce((sum, item) => sum + toNum(item.amount) * item.quantity, 0);
+  const advanceAmount = toNum(invoice.advanceAmount);
+  const showAdvanceRows = (invoice.advanceStatus === "REQUESTED" || invoice.advanceStatus === "PAID") && advanceAmount > 0;
+  const isAdvancePaid = invoice.advanceStatus === "PAID";
+  const amountDue = isAdvancePaid ? workersSum - advanceAmount : workersSum;
 
   return (
     <Document>
@@ -270,6 +304,26 @@ export function InvoicePdfDocument({
               </Text>
             </View>
           ))}
+
+          {showAdvanceRows && (
+            <>
+              <View style={styles.subtotalRow}>
+                <Text style={[styles.subtotalLabel, { width: "78%" }]}>Subtotal</Text>
+                <Text style={[styles.subtotalValue, { width: "22%" }]}>
+                  {invoice.currency} {fmtAmount(workersSum)}
+                </Text>
+              </View>
+              <View style={styles.advanceRow}>
+                <Text style={[isAdvancePaid ? styles.advanceLabelPaid : styles.advanceLabelRequested, { width: "78%" }]}>
+                  {isAdvancePaid ? "Less: Advance Paid" : "Advance Requested"}
+                </Text>
+                <Text style={[isAdvancePaid ? styles.advanceValuePaid : styles.advanceValueRequested, { width: "22%" }]}>
+                  {isAdvancePaid ? "− " : ""}
+                  {invoice.currency} {fmtAmount(advanceAmount)}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
 
         <View style={{ flex: 1, minHeight: 21 }} />
@@ -288,7 +342,7 @@ export function InvoicePdfDocument({
               <Text>
                 <Text style={styles.amountLabel}>Amount: </Text>
                 <Text style={styles.amountValue}>
-                  {invoice.currency} {fmtAmount(invoice.totalAmount)}/-
+                  {invoice.currency} {fmtAmount(amountDue)}/-
                 </Text>
               </Text>
             </View>

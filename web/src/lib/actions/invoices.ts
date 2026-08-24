@@ -29,6 +29,19 @@ function decimalToNumber(d: Prisma.Decimal | number): number {
   return typeof d === "number" ? d : d.toNumber();
 }
 
+function decimalToNumberOrNull(d: Prisma.Decimal | number | null): number | null {
+  return d === null ? null : decimalToNumber(d);
+}
+
+// The advance amount only reduces what's actually owed once it's PAID — a
+// merely REQUESTED advance is a note to the reader, not money already
+// received. Matches the legacy calculator exactly (see the comment on
+// Invoice.advanceStatus in schema.prisma).
+function computeAmountDue(totalAmount: number, advanceStatus: string, advanceAmount: number | null): number {
+  if (advanceStatus === "PAID" && advanceAmount) return totalAmount - advanceAmount;
+  return totalAmount;
+}
+
 async function listInvoicesInternal() {
   const rows = await db.invoice.findMany({
     orderBy: { createdAt: "desc" },
@@ -36,7 +49,16 @@ async function listInvoicesInternal() {
       items: { select: { id: true } },
     },
   });
-  return rows.map((r) => ({ ...r, totalAmount: decimalToNumber(r.totalAmount) }));
+  return rows.map((r) => {
+    const totalAmount = decimalToNumber(r.totalAmount);
+    const advanceAmount = decimalToNumberOrNull(r.advanceAmount);
+    return {
+      ...r,
+      totalAmount,
+      advanceAmount,
+      amountDue: computeAmountDue(totalAmount, r.advanceStatus, advanceAmount),
+    };
+  });
 }
 
 export type InvoiceListRow = Awaited<ReturnType<typeof listInvoicesInternal>>[number];
@@ -57,9 +79,13 @@ async function getInvoiceInternal(id: string) {
     },
   });
   if (!invoice) return null;
+  const totalAmount = decimalToNumber(invoice.totalAmount);
+  const advanceAmount = decimalToNumberOrNull(invoice.advanceAmount);
   return {
     ...invoice,
-    totalAmount: decimalToNumber(invoice.totalAmount),
+    totalAmount,
+    advanceAmount,
+    amountDue: computeAmountDue(totalAmount, invoice.advanceStatus, advanceAmount),
     items: invoice.items.map((item) => ({ ...item, amount: decimalToNumber(item.amount) })),
   };
 }
@@ -143,6 +169,8 @@ export async function createInvoice(input: InvoiceFormInput): Promise<ActionResu
           notes: data.notes || null,
           issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
           dueAt: data.dueAt ? new Date(data.dueAt) : null,
+          advanceStatus: data.advanceStatus,
+          advanceAmount: data.advanceStatus === "NONE" ? null : data.advanceAmount,
           items: {
             create: data.items.map((item) => ({
               candidateId: item.candidateId || null,
@@ -192,6 +220,8 @@ export async function updateInvoice(id: string, input: InvoiceFormInput): Promis
             notes: data.notes || null,
             issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
             dueAt: data.dueAt ? new Date(data.dueAt) : null,
+            advanceStatus: data.advanceStatus,
+            advanceAmount: data.advanceStatus === "NONE" ? null : data.advanceAmount,
             items: {
               create: data.items.map((item) => ({
                 candidateId: item.candidateId || null,

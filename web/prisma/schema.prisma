@@ -246,6 +246,17 @@ model Invoice {
   issuedAt    DateTime?
   dueAt       DateTime?
   paidAt      DateTime?
+  // Advance payment: a real legacy feature (invoice.html's "Advance" row,
+  // a None/Requested/Paid select plus an amount), migrated into
+  // Invoice.notes as JSON with no schema home (see migrate-legacy-data.ts)
+  // and left unbuilt until the user asked for it directly. totalAmount
+  // above stays the raw sum of items (what the PDF's own "Subtotal" row
+  // shows); advanceAmount is only ever subtracted from that at display
+  // time, and only once actually PAID. A merely "requested" advance is a
+  // note to the reader, not a change to what's owed yet, matching the
+  // legacy calculator's own behavior exactly.
+  advanceStatus String   @default("NONE") // "NONE" | "REQUESTED" | "PAID"
+  advanceAmount Decimal?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }

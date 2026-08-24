@@ -728,6 +728,51 @@ under Phase 0 below — build the new one.
   instruction than this one, so it wins; and the `MIGRATION_MARKER` sentinel string in
   `invoice-pdf.tsx` is never actually displayed to anyone (it's stripped out by `humanNotes()`
   before rendering), so there was nothing to gain by editing it.
+- **Invoice advance payments — done.** The user asked directly: "for invoices, there needs to be
+  options to list advance paid... even if we are requesting for advance we should be able to do
+  that." A real legacy feature — `invoice.html` has a None/Requested/Paid advance select plus an
+  amount, and `migrate-legacy-data.ts` had already preserved it per-invoice as JSON inside
+  `Invoice.notes` (see the `MIGRATED FROM LEGACY` blob referenced above) precisely because the
+  original schema had nowhere else to put it — but nothing in the rebuilt app ever exposed it as
+  an actual feature until now. Added real columns instead of leaving it stuck in the notes blob:
+  `Invoice.advanceStatus` ("NONE"/"REQUESTED"/"PAID", default "NONE") and `Invoice.advanceAmount`
+  (nullable Decimal), migrated live against Supabase. `computeAmountDue()`
+  (`lib/actions/invoices.ts`) is the one place the reduction rule lives: an advance only reduces
+  what's owed once it's actually **PAID** — a merely **REQUESTED** advance is a note to the reader,
+  not money in hand yet, matching `invoice.html`'s own calculator (`total = workersSum -
+  (status === 'paid' ? advanceAmt : 0)`) exactly rather than reinventing the rule. Wired through
+  every layer that touches an invoice's total:
+  - **Form** (`invoice-form.tsx`): an Advance select + amount input next to the line items, with a
+    live "Subtotal ... less advance paid ..." / "Amount due" preview via RHF `watch()`, matching
+    invoice.html's own live calculator bar. Validation (`invoiceFormSchema` in
+    `lib/validation/invoice.ts`) requires a nonzero amount whenever status isn't "NONE". The
+    read-only view for a non-draft invoice (can't be edited past Draft, per the existing status
+    workflow) got a real summary card in the same pass — it used to show almost nothing useful.
+  - **List** (`invoice-list.tsx`): an "Amount due" column (strikethrough original total shown
+    alongside when an advance changes it) and an "Advance" badge column (amber "Advance
+    requested" / red "Advance paid" — "None" renders nothing, same as legacy's calculator omitting
+    an empty advance row entirely).
+  - **PDF** (`lib/pdf/invoice-pdf.tsx`): exact port of `invoice.html`'s `advanceHtml` block — a
+    gray "Subtotal" row plus an amber "Advance Requested" / red "Less: Advance Paid" row inserted
+    into the services table right after the line items, only when status is requested/paid with a
+    real amount (never for "None"). The big teal Amount box at the bottom reflects `amountDue`
+    (already advance-reduced when paid), not the raw item subtotal, matching legacy's own
+    `inv.total` field. This template is one of the two the user separately declared "cant change
+    at all" for its *existing* content — this addition is new content the legacy version already
+    had and this rebuild had simply never carried over, not a stylistic change to what was there.
+  Duplicating an invoice deliberately does **not** carry over advance fields — a duplicate starts
+  fresh at "NONE", since an advance is specific to one billing event, not something that should
+  silently propagate to a new draft.
+  **Verified live, not just typechecked**: a throwaway local Playwright script created one
+  invoice with `advanceStatus: REQUESTED` and one with `PAID` (both $1,000 subtotal, $300
+  advance), fetched each real PDF, and rendered both to PNG via PyMuPDF to look at the actual
+  output — confirmed the Requested variant shows the amber row with Amount unchanged at
+  $1,000.00, and the Paid variant shows the red "Less: Advance Paid − USD 300.00" row with Amount
+  correctly reduced to $700.00. Caught and fixed one real layout bug this way: the advance value
+  column was initially too narrow (matching the item-row proportions exactly), so "− USD 300.00"
+  wrapped to two lines — widened that one column (78%/22% instead of 84%/16%) rather than leaving
+  a visual defect uncaught by typecheck. Test invoices and the verification script were deleted
+  after confirming correctness, not left as clutter.
 
 ## Tech stack (exact)
 
