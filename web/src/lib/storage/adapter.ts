@@ -21,7 +21,10 @@ export interface StorageAdapter {
 }
 
 import { localDiskAdapter } from "./local-adapter";
+import { supabaseStorageAdapter } from "./supabase-adapter";
 
-// No R2 credentials configured yet (Phase 3 stand-in, per CLAUDE.md) — this
-// is the only place that needs to change once they exist.
-export const storage: StorageAdapter = localDiskAdapter;
+// Supabase Storage is the real backend once SUPABASE_URL is set; the
+// local-disk stand-in (Phase 3, pre-Supabase) stays as the fallback for
+// running the app locally without cloud credentials. This is the only
+// place that needs to change to swap backends again later (e.g. to R2).
+export const storage: StorageAdapter = process.env.SUPABASE_URL ? supabaseStorageAdapter : localDiskAdapter;
