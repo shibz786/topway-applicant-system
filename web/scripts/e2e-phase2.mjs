@@ -75,13 +75,22 @@ await page.fill('input[name="items.0.description"]', "Test line item");
 await page.fill('input[name="items.0.quantity"]', "2");
 await page.fill('input[name="items.0.amount"]', "150");
 await page.getByRole("button", { name: "Create invoice" }).click();
-await page.waitForTimeout(1200);
+// Wait for the actual redirect off /invoices/new rather than a fixed
+// delay — against Supabase (real network latency, not localhost) a flat
+// 1200ms isn't always enough, and the old regex below happened to also
+// match the literal word "new" (it's all lowercase a-z), so a premature
+// read silently produced a bogus /api/invoices/new/pdf URL for the PDF
+// check further down instead of failing loudly here.
+await page.waitForURL(/\/invoices\/(?!new$)[a-z0-9]+$/, { timeout: 10000 }).catch(() => {});
 const afterCreateUrl = page.url();
-check("invoice created, navigated to its detail page", /\/invoices\/[a-z0-9]+$/.test(afterCreateUrl));
+check("invoice created, navigated to its detail page", /\/invoices\/(?!new$)[a-z0-9]+$/.test(afterCreateUrl));
 
 // --- 7. Transition status Draft -> Sent, with confirmation modal ---
 await page.goto(`${BASE}/invoices`);
-await page.waitForTimeout(500);
+// 500ms was tuned against local Postgres; against Supabase (network round
+// trip to the DB, not localhost) the list can still be loading at that
+// point — bumped rather than tightening the test's expectations.
+await page.waitForTimeout(1500);
 await page.getByRole("button", { name: "More" }).first().click();
 await page.getByRole("menuitem", { name: /Mark as Sent/i }).click();
 check("confirmation dialog appears before status change", await page.getByRole("alertdialog").isVisible());

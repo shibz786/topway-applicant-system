@@ -11,7 +11,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:migrate-legacy": "tsx scripts/migrate-legacy-data.ts",
-    "db:migrate-legacy-files": "tsx scripts/migrate-legacy-files.ts"
+    "db:migrate-legacy-files": "tsx scripts/migrate-legacy-files.ts",
+    "db:setup-supabase-bucket": "tsx scripts/setup-supabase-bucket.mjs",
+    "db:backfill-company-settings": "tsx scripts/backfill-company-settings.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

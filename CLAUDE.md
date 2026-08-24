@@ -536,21 +536,103 @@ under Phase 0 below — build the new one.
   `role="cell"` that can never exist there — `/admin/candidates` redirects agents to `/agent`,
   which renders Cards, not a table — confirmed by reading both files that this redirect and the
   card-based agent UI both predate this session, so it isn't something introduced now.
+- **GitHub + Supabase — done.** The user asked to push this to GitHub and move the database to
+  Supabase. Repo: root-level `.gitignore` added (there wasn't one) excluding the legacy app's real
+  candidate data — `data/` and `uploads/`, 126 real photos/passport numbers — since it's already
+  fully migrated and nothing running needs it; `web/.gitignore` already correctly excluded
+  `.env*`/`.local-storage/`/migration output. Public, per the user's explicit choice. Later moved
+  to a second GitHub account the user logged into mid-session — `gh auth login` (device-code flow,
+  the same non-interactive-friendly pattern used for Supabase below), then a fresh
+  `gh repo create` + `git remote set-url` under the new account (the original repo under the first
+  account was left alone, not deleted — that's not a reversible action to take unasked).
+  **Supabase**: created via the `supabase` CLI (`npx supabase`, logged in with a personal access
+  token the user generated, since — unlike `gh`— it has no device-code fallback for a non-TTY
+  session) rather than walking the user through the dashboard by hand: `supabase projects create`
+  (ap-southeast-1/Singapore — closest low-latency region to Sri Lanka and the candidates'
+  destination countries), `prisma migrate deploy` to lay down the schema, a private
+  `candidate-files` bucket created via a one-off script using the same `@supabase/supabase-js`
+  client the real adapter uses. New `src/lib/storage/supabase-adapter.ts` implements the existing
+  `StorageAdapter` interface (upload/download/delete/createSignedUrl via the Storage API);
+  `src/lib/storage/adapter.ts` now picks it over the local-disk stand-in whenever `SUPABASE_URL`
+  is set — no other file needed to change, confirming the adapter-interface investment from Phase
+  3 paid off exactly as intended. Data: reseeded clean rather than copying over the local dev DB's
+  accumulated e2e-test-script pollution — reran `db:seed` + `migrate-legacy-data.ts` +
+  `migrate-legacy-files.ts` + a small `backfill-company-settings.mjs` (kept, idempotent) fresh
+  against the empty Supabase DB, landing exactly the real 20 candidates / 5 agents / 4 invoices /
+  bank details, nothing else.
+  **Two real, non-obvious bugs found only by actually driving the app against the new backend, not
+  by the migration scripts reporting success** — the same lesson every phase in this file has
+  already learned once:
+  1. **Interactive-transaction data loss under PgBouncer transaction-mode pooling.** `DATABASE_URL`
+     was first set to Supabase's "Transaction" pooler (port 6543). `createInvoice`/
+     `duplicateInvoice`'s sequential-numbering logic (`db.$transaction(async (tx) => {...},
+     {isolationLevel: Serializable})`) is a genuine interactive transaction — and PgBouncer's
+     transaction-pooling mode can route different statements within one logical transaction to
+     different backend connections, silently breaking that guarantee. Symptom was ugly precisely
+     because it wasn't a thrown error: the UI reported success and navigated to the new invoice's
+     detail page, but the row was never actually in the database — caught by directly querying
+     Supabase after an e2e run claimed success and finding only the 4 original migrated invoices,
+     not 5. Fixed by pointing `DATABASE_URL` at Supabase's **session-mode** pooler (same pooler
+     host, port 5432 instead of 6543) instead — one backend connection per client for the session's
+     duration, so interactive transactions and prepared statements work like a real direct
+     connection while staying pooled/IPv4-friendly; `DIRECT_URL` (Prisma Migrate only) stays the
+     true direct connection. Full reasoning left as a long comment in `prisma/schema.prisma` and
+     `.env.example` specifically warning against flipping this back to port 6543 without also
+     restructuring `createInvoice`/`duplicateInvoice` off interactive transactions.
+  2. **CSP blocked every candidate photo thumbnail.** `middleware.ts`'s `img-src` was `'self' data:
+     blob:` — correct for the local-disk stand-in (its signed URLs are same-origin) but Supabase's
+     signed URLs point at `https://<ref>.supabase.co`, a different origin, so the browser silently
+     dropped every `<img src>` using one (candidate table avatars, agent portal cards) with a CSP
+     console error — the candidate PDF route wasn't affected and kept working, because it fetches
+     bytes server-side via `storage.getObject()` and never goes through `img-src` at all, which is
+     exactly why this stayed invisible to the PDF-focused verification until an e2e run's console
+     output was actually read. Fixed by adding the Supabase project's origin (derived from
+     `SUPABASE_URL`, not hardcoded) to `img-src` only when it's set.
+  Also found and fixed a latent bug in `e2e-phase2.mjs` itself while investigating: its
+  invoice-created check used `/\/invoices\/[a-z0-9]+$/`, which — being case-insensitive-oblivious
+  lowercase-only — also matches the literal word "new". Against local Postgres the create→redirect
+  was always fast enough that this never mattered; against Supabase's real network latency, a
+  premature URL read could catch the page still on `/invoices/new` and silently build a bogus
+  `/api/invoices/new/pdf` check instead of failing loudly at the real assertion. Fixed to wait for
+  the actual redirect and exclude "new" explicitly.
+  **Verified live, end to end, not just via migration-script exit codes**: reran Phase 2 to a full
+  clean 17/17 against the real Supabase DB (this specifically exercises the fixed transaction path
+  — invoice creation, status transition, PDF generation all for real); a candidate PDF fetched and
+  rendered to an image via PyMuPDF showing a real photo pulled through Supabase Storage, twice, to
+  confirm the first request wasn't a fluke; the ATS table's signed-URL thumbnails loading with zero
+  CSP console errors after the fix (versus two visible violations before it). Phases 4/5/6 show
+  a mix of real passes (all of Phase 6's actual security assertions — rate limiting, lockout,
+  session revocation, permission enforcement — passed) and toast/visibility-timing failures with
+  zero server-side errors alongside them; spot-checked two of those directly against the DB
+  (a databank request + approval, an invoice creation) and confirmed the underlying writes had in
+  fact succeeded — these are the scripts' hardcoded wait times, tuned for local Postgres latency,
+  now sometimes too tight for a real network round trip to Singapore, not new product bugs. Not
+  chased down further in this pass (a full audit of every wait in every e2e-phaseN script is a
+  separate, mechanical follow-up) to avoid unbounded scope creep on top of an already large
+  infrastructure change.
+  **Still local-only / not yet done**: Upstash Redis (rate limiting/session blacklist still the
+  in-memory stand-in) and Resend (email still the local `.log` stand-in) — same adapter-swap
+  pattern as storage, whenever the user wants those provisioned too.
 
 ## Tech stack (exact)
 
 - Next.js 15, App Router, TypeScript strict mode
 - Tailwind CSS v4 + shadcn/ui (Radix primitives)
-- PostgreSQL 16 via Neon + Prisma ORM v5
+- PostgreSQL via Supabase + Prisma ORM v5 (originally speced as Neon; moved to Supabase per the
+  user's direction — see the GitHub + Supabase entry above for the connection-string details that
+  actually matter, notably: use the session-mode pooler for `DATABASE_URL`, not transaction-mode)
 - Lucia v3 auth — per-login sessions stored in DB, httpOnly cookies, 48h expiry with sliding
   refresh
-- Cloudflare R2 (private bucket) for files; all downloads via signed URLs through a route handler
-- Upstash Redis — sliding-window rate limiting on login, session blacklist on sign-out
+- File storage: Supabase Storage (private bucket, signed URLs via `src/lib/storage/
+  supabase-adapter.ts`) — originally speced as Cloudflare R2; same private-bucket-plus-signed-URL
+  model either way, so the spec's security requirement is unchanged even though the vendor is not
+- Upstash Redis — sliding-window rate limiting on login, session blacklist on sign-out (still the
+  in-memory local stand-in — not yet provisioned)
 - React Hook Form + Zod (same schema client- and server-side)
 - TanStack Query v5 for client data fetching
 - @react-pdf/renderer, server-side, for candidate profiles and invoices
-- Resend + React Email for notifications
-- Deploy: Vercel + Neon
+- Resend + React Email for notifications (still the local `.log` stand-in — not yet provisioned)
+- Deploy: Vercel + Supabase
 
 ## Non-negotiable security rules
 
@@ -609,8 +691,9 @@ Each phase must be fully working before the next starts.
 ## What's needed from the user before Phase 1 can go live
 
 Provisioning these is the user's call, not something to assume or spend money on unasked:
-- Neon Postgres connection string
-- Cloudflare R2 bucket + access keys
+- ~~Neon Postgres connection string~~ — done, moved to Supabase instead (see the GitHub + Supabase
+  status entry above)
+- ~~Cloudflare R2 bucket + access keys~~ — done, moved to Supabase Storage instead, same entry
 - Upstash Redis REST URL + token
 - Resend API key
 - Vercel project (for eventual deploy)

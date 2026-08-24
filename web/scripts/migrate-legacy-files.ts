@@ -17,12 +17,22 @@
  * Idempotent: skips a candidate/type or an agent that already has a
  * Document/logoR2Key, so reruns are safe.
  *
- * Deliberately reimplements (rather than imports) the magic-byte check and
- * local-disk write instead of pulling in src/lib/storage/* — those files
- * are "server-only", which only resolves under Next's build; migrate-
- * legacy-data.ts set the same precedent of a fully standalone script.
+ * Deliberately reimplements (rather than imports) the magic-byte check
+ * instead of pulling in src/lib/storage/validate-upload.ts — that file is
+ * "server-only", which only resolves under Next's build; migrate-legacy-
+ * data.ts set the same precedent of a fully standalone script.
+ *
+ * putObject() below picks Supabase Storage or the local-disk stand-in
+ * using the exact same SUPABASE_URL check src/lib/storage/adapter.ts
+ * uses — this MUST mirror that selection, or (as happened on the first
+ * version of this script) it silently writes files to local disk while
+ * the live app is actually reading from Supabase, leaving every Document
+ * row pointing at a key that was never actually uploaded anywhere the app
+ * can see. @supabase/supabase-js has no "server-only" restriction, so it's
+ * safe to import directly in this standalone script.
  */
 import { PrismaClient } from "@prisma/client";
+import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -31,6 +41,13 @@ const db = new PrismaClient();
 const REPO_ROOT = join(process.cwd(), ".."); // web/ -> repo root
 const UPLOADS_DIR = join(REPO_ROOT, "uploads");
 const STORAGE_DIR = join(process.cwd(), ".local-storage");
+
+const supabase = process.env.SUPABASE_URL
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { persistSession: false },
+    })
+  : null;
+const SUPABASE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "candidate-files";
 
 function detectMimeFromBytes(buffer: Buffer): string | null {
   if (buffer.length < 4) return null;
@@ -59,7 +76,12 @@ function detectMimeFromBytes(buffer: Buffer): string | null {
   return null;
 }
 
-function putObject(key: string, body: Buffer) {
+async function putObject(key: string, body: Buffer, contentType: string) {
+  if (supabase) {
+    const { error } = await supabase.storage.from(SUPABASE_BUCKET).upload(key, body, { contentType, upsert: true });
+    if (error) throw new Error(`Supabase upload failed for ${key}: ${error.message}`);
+    return;
+  }
   mkdirSync(STORAGE_DIR, { recursive: true });
   writeFileSync(join(STORAGE_DIR, key), body);
 }
@@ -107,7 +129,7 @@ async function main() {
       }
 
       const key = randomUUID();
-      putObject(key, buffer);
+      await putObject(key, buffer, mime);
       await db.document.create({
         data: { candidateId: c.newId, type, r2Key: key, mimeType: mime, sizeBytes: buffer.length },
       });
@@ -147,7 +169,7 @@ async function main() {
     }
 
     const key = randomUUID();
-    putObject(key, buffer);
+    await putObject(key, buffer, mime);
     await db.agent.update({ where: { id: agent.id }, data: { logoR2Key: key } });
     agentLogosSet++;
   }

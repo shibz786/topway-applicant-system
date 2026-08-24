@@ -16,6 +16,17 @@ export function middleware(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV !== "production";
 
+  // Candidate photo/document thumbnails render as <img src={signedUrl}>
+  // where signedUrl is a real Supabase-hosted URL once
+  // src/lib/storage/supabase-adapter.ts is the active adapter (SUPABASE_URL
+  // set) — those need an img-src allowance or the browser silently drops
+  // every one of them (caught by an actual Playwright run showing broken
+  // thumbnails + a CSP console error, not by the PDF route working fine,
+  // since that fetches bytes server-side and never goes through img-src at
+  // all). The local-disk stand-in's signed URLs are same-origin (`self`)
+  // already, so this is additive, not a fallback swap.
+  const supabaseOrigin = process.env.SUPABASE_URL ? new URL(process.env.SUPABASE_URL).origin : null;
+
   const csp = [
     "default-src 'self'",
     // 'unsafe-eval' is required in dev only (Next's dev-mode React Refresh /
@@ -23,7 +34,7 @@ export function middleware(request: NextRequest) {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob:",
+    `img-src 'self' data: blob:${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
     "connect-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",

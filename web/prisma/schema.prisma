@@ -7,14 +7,24 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // DATABASE_URL: Supabase's pooled (pgbouncer, port 6543) connection —
-  // what the app actually queries through at runtime, since Postgres
-  // itself caps concurrent connections and a pool is required once this
-  // is serverless-deployed (Vercel).
+  // DATABASE_URL: Supabase's SESSION-mode pooler (port 5432 via the
+  // pooler host) — what the app queries through at runtime. Deliberately
+  // NOT the transaction-mode pooler (port 6543): invoices.ts's sequential-
+  // numbering logic uses a real interactive $transaction() with SERIALIZABLE
+  // isolation, and PgBouncer's transaction-pooling mode can route different
+  // statements within one "transaction" to different backend connections —
+  // which silently breaks that guarantee (confirmed live: createInvoice
+  // returned success and navigated to the new invoice's page, but the row
+  // was never actually there). Session mode keeps one backend connection
+  // per client for the session's duration, so interactive transactions and
+  // prepared statements work exactly like a direct connection, while still
+  // being pooled/IPv4-friendly. If this ever needs to move to transaction-
+  // mode pooling for higher concurrency (many serverless cold-starts), the
+  // $transaction blocks would need to run against a second client bound to
+  // DIRECT_URL instead — don't just flip DATABASE_URL back to port 6543.
   url = env("DATABASE_URL")
-  // DIRECT_URL: Supabase's direct (port 5432) connection. Prisma Migrate
-  // needs this specifically — pgbouncer's transaction pooling mode
-  // doesn't support the prepared statements migrations rely on.
+  // DIRECT_URL: Supabase's true direct (non-pooled) connection. Prisma
+  // Migrate uses this specifically, independent of the above.
   directUrl = env("DIRECT_URL")
 }
 
