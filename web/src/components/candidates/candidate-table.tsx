@@ -197,8 +197,8 @@ function CandidateRow({ row, onClick }: { row: CandidateListRow; onClick: () => 
         )}
       </TableCell>
       <TableCell>{row.agentName ?? <span className="text-muted-foreground">Unassigned</span>}</TableCell>
-      <TableCell>{row.destinationCountry ? DEST_COUNTRY_LABELS[row.destinationCountry] : "—"}</TableCell>
-      <TableCell>{row.departureDate ? new Date(row.departureDate).toLocaleDateString() : "—"}</TableCell>
+      <TableCell>{row.destinationCountry ? DEST_COUNTRY_LABELS[row.destinationCountry] : "-"}</TableCell>
+      <TableCell>{row.departureDate ? new Date(row.departureDate).toLocaleDateString() : "-"}</TableCell>
       <TableCell>
         <ApplicationStatusChip status={row.applicationStatus} />
       </TableCell>

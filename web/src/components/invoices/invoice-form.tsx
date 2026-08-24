@@ -148,7 +148,7 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
                     <SelectValue placeholder="Select agent" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none">— None —</SelectItem>
+                    <SelectItem value="__none">None</SelectItem>
                     {agents?.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.companyName} ({a.country})
@@ -194,10 +194,10 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
                   render={({ field: f }) => (
                     <Select value={f.value ?? "__none"} onValueChange={(v) => f.onChange(v === "__none" ? null : v)}>
                       <SelectTrigger>
-                        <SelectValue placeholder="—" />
+                        <SelectValue placeholder="-" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none">— None —</SelectItem>
+                        <SelectItem value="__none">None</SelectItem>
                         {candidates?.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.fullName}

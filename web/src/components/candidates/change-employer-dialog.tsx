@@ -153,7 +153,7 @@ export function ChangeEmployerDialog({
           </DialogFooter>
           {!currentAgentId && (
             <p className="text-xs text-muted-foreground">
-              This candidate has no current agent — use Assign instead of Change Employer.
+              This candidate has no current agent. Use Assign instead of Change Employer.
             </p>
           )}
         </form>

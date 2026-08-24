@@ -37,7 +37,7 @@ export function BlacklistTable() {
   if (!data || data.length === 0) {
     return (
       <Card className="p-8 text-center text-sm text-muted-foreground">
-        No disputes have been recorded — nobody appears on the blacklist.
+        No disputes have been recorded. Nobody appears on the blacklist.
       </Card>
     );
   }

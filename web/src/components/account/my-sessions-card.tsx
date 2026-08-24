@@ -43,7 +43,7 @@ export function MySessionsCard({ userId }: { userId: string }) {
       if (!res.ok) throw new Error(res.error);
     },
     onSuccess: () => {
-      toast.success("Signed out everywhere — you'll need to sign in again here too");
+      toast.success("Signed out everywhere. You'll need to sign in again here too");
       queryClient.invalidateQueries({ queryKey });
     },
     onError: (e: Error) => toast.error(e.message),

@@ -151,7 +151,7 @@ function AttentionCard({ items }: { items: OpsDashboardData["attention"] }) {
         <span className="font-mono text-[10.5px] text-muted-foreground">{items.length} entries</span>
       </div>
       {items.length === 0 ? (
-        <p className="p-4 text-sm text-muted-foreground">All clear — no open disputes, overdue invoices, or unreviewed closures.</p>
+        <p className="p-4 text-sm text-muted-foreground">All clear. No open disputes, overdue invoices, or unreviewed closures.</p>
       ) : (
         <div>
           {items.map((item) => (
@@ -195,7 +195,7 @@ function ActivityCard({ items }: { items: OpsDashboardData["activity"] }) {
             <div key={item.id} className="flex items-center gap-3 border-b border-dashed py-2.5 text-sm last:border-b-0">
               <span className="w-16 shrink-0 font-mono text-[10.5px] text-muted-foreground">{relTime(item.at)}</span>
               <span>
-                {item.label} — <span className="font-medium">{item.detail}</span>
+                {item.label}: <span className="font-medium">{item.detail}</span>
               </span>
             </div>
           ))}

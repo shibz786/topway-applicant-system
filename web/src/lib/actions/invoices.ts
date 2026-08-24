@@ -170,7 +170,7 @@ export async function updateInvoice(id: string, input: InvoiceFormInput): Promis
     const existing = await db.invoice.findUnique({ where: { id } });
     if (!existing) throw new ActionError("Invoice not found");
     if (existing.status !== "DRAFT") {
-      throw new ActionError("Only draft invoices can be edited — void and recreate instead");
+      throw new ActionError("Only draft invoices can be edited, void and recreate instead");
     }
 
     // Array-batch form, not the interactive callback form — the two writes
@@ -286,7 +286,7 @@ export async function deleteDraftInvoice(id: string): Promise<ActionResult<null>
     const existing = await db.invoice.findUnique({ where: { id } });
     if (!existing) return null;
     if (existing.status !== "DRAFT") {
-      throw new ActionError("Only draft invoices can be deleted — void it instead");
+      throw new ActionError("Only draft invoices can be deleted, void it instead");
     }
 
     // Array-batch form — see the comment in updateInvoice() above, same

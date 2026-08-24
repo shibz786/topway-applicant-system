@@ -35,7 +35,7 @@ async function unwrapUnseenClosures() {
 
 const STAGE_LABELS: Record<ContractStage, string> = {
   PRE_DEPARTURE: "Documentation / pre-departure",
-  WORK_IN_PROGRESS: "Departed — probation",
+  WORK_IN_PROGRESS: "Departed, probation",
   PROBATION_COMPLETED: "Probation complete",
   MID_CONTRACT: "Mid-contract",
   CONTRACT_CLOSED: "Contract closed",
@@ -150,7 +150,7 @@ async function buildOpsDashboard(user: Awaited<ReturnType<typeof requireSession>
   for (const d of openDisputeRows) {
     attention.push({
       id: `dispute-${d.id}`,
-      title: `${d.candidate.fullName} — ${d.type.replaceAll("_", " ").toLowerCase()}`,
+      title: `${d.candidate.fullName}: ${d.type.replaceAll("_", " ").toLowerCase()}`,
       subtitle: `Reported ${relativeDay(d.createdAt)}`,
       severity: "critical",
       href: "/admin/candidates",
@@ -160,7 +160,7 @@ async function buildOpsDashboard(user: Awaited<ReturnType<typeof requireSession>
     for (const n of unseenClosures.slice(0, 3)) {
       attention.push({
         id: `closure-${n.id}`,
-        title: `${n.candidate.fullName} — contract closed`,
+        title: `${n.candidate.fullName}: contract closed`,
         subtitle: "Needs review acknowledgement",
         severity: "warn",
         href: "/admin/tracking",

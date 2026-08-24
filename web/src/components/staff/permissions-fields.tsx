@@ -6,11 +6,11 @@ import { Label } from "@/components/ui/label";
 import type { Permissions } from "@/lib/permissions";
 
 const PERMISSION_LABELS: Record<keyof Permissions, string> = {
-  applications: "Applications — create/edit candidate profiles",
-  databank: "Databank — browse the candidate databank",
-  invoices: "Invoices — access the invoicing portal",
-  agents: "Agents — assign/reassign candidates to agents",
-  tracking: "Tracking — visa pipeline, departure, disputes",
+  applications: "Applications: create/edit candidate profiles",
+  databank: "Databank: browse the candidate databank",
+  invoices: "Invoices: access the invoicing portal",
+  agents: "Agents: assign/reassign candidates to agents",
+  tracking: "Tracking: visa pipeline, departure, disputes",
 };
 
 // Generic over any form whose values include a `permissions: Permissions`

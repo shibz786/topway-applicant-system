@@ -1,22 +1,22 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-// Display face — headings only (see globals.css --font-heading). "The
-// Register" direction (picked by the user from two mockup options — see
-// CLAUDE.md): a serif with real document-office gravitas, fitting for a
-// tool that spends its day on passports, licenses, and case files, without
-// tipping into a generic template serif.
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+// Display face - headings only (see globals.css --font-heading). Swapped
+// off Fraunces (a serif, "The Register" direction) for a cleaner, more
+// current geometric sans - Geist is purpose-built for software UI and,
+// since this app deploys on Vercel, is a natural fit for the surface it
+// actually runs on.
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["500", "600", "700", "800"],
 });
 
-// Body/UI/data face — carries every paragraph, label, and table cell in
+// Body/UI/data face - carries every paragraph, label, and table cell in
 // the app. Chosen for legibility at the small sizes a dense ATS table
 // demands, not for character.
 const inter = Inter({
@@ -24,10 +24,11 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-// Utility/data face — reference numbers, invoice/passport numbers, KPI
-// figures. Anywhere a number should read as counted, not decorated.
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
+// Utility/data face - reference numbers, invoice/passport numbers, KPI
+// figures. Anywhere a number should read as counted, not decorated. Pairs
+// naturally with Geist proper above (same type family, built together).
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
   weight: ["500", "600"],
 });
@@ -53,7 +54,7 @@ export default async function RootLayout({
     // expected and harmless, this is next-themes' own documented fix.
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} antialiased`}
+        className={`${geist.variable} ${inter.variable} ${geistMono.variable} antialiased`}
       >
         <Providers nonce={nonce}>{children}</Providers>
         <Toaster />

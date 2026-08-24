@@ -19,7 +19,7 @@ export default async function AgentDatabankPage() {
         <h1 className="font-heading text-xl font-semibold">Candidate Databank</h1>
         <p className="text-sm text-muted-foreground">
           Browse candidates available for assignment. Requesting a candidate notifies Topway
-          admin for approval — it isn&apos;t self-service.
+          admin for approval. It isn&apos;t self-service.
         </p>
       </div>
       <DatabankBrowser />

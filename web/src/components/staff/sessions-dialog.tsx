@@ -59,7 +59,7 @@ export function SessionsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Active sessions — {userName}</DialogTitle>
+          <DialogTitle>Active sessions: {userName}</DialogTitle>
           <DialogDescription>
             Revoking a session deletes it immediately; any request replaying that token gets 401
             right away.

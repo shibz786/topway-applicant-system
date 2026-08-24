@@ -13,7 +13,7 @@ export default async function BlacklistPage() {
         <h1 className="font-heading text-xl font-semibold">Blacklist</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Every candidate with a recorded dispute, and which company was handling them at the
-          time — shared across every company on this platform so a problem with one placement
+          time. Shared across every company on this platform so a problem with one placement
           isn&apos;t repeated with another.
         </p>
       </div>

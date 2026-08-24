@@ -81,7 +81,7 @@ function AgentDashboardBody({ name, data }: { name: string; data: AgentDashboard
       </Link>
       {data.hasDatabankAccess && (
         <p className="text-xs text-muted-foreground">
-          You also have Databank access — remarketing-eligible candidates are waiting in the same portal.
+          You also have Databank access. Remarketing-eligible candidates are waiting in the same portal.
         </p>
       )}
     </div>

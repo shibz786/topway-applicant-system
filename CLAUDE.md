@@ -693,6 +693,41 @@ under Phase 0 below — build the new one.
   dashboard** (Project Settings → Database → Reset Database Password) — `.env` and Vercel are
   still on the original (now-exposed) password, which the app depends on until that's done, so
   send the new one over once rotated and it gets wired into both places in one pass.
+- **Fixed the real cause of "the whole platform is slow" — Vercel/Supabase region mismatch.** The
+  Vercel project's serverless function region was the default `iad1` (US East, Washington DC);
+  the Supabase project is `ap-southeast-1` (Singapore) — every single database round trip on
+  every page was crossing half the globe. Not a guess: confirmed by checking the project's actual
+  `serverlessFunctionRegion` via the Vercel Management API (no CLI subcommand exists for this
+  either), and by the exact symptom shape matching a network-latency problem — every page slow,
+  not specific features. Fixed by setting `serverlessFunctionRegion` to `sin1` (Singapore) via the
+  same API. Impact measured directly, before/after, with the same two scripts already in the repo:
+  `verify:prod-invoice` went from 20 to 28 seconds down to under a second; `verify:prod-login`'s 5
+  concurrent logins went from ~7s each to ~2.5-3s (the remainder is real Argon2id hashing cost,
+  not network latency). This single setting change was a bigger win than anything else touched in
+  this pass — worth remembering if the platform ever feels slow again after moving infrastructure.
+- **Fonts: Fraunces + IBM Plex Mono → Geist + Geist Mono.** The user asked for "more modern
+  appropriate fonts" — Fraunces (a serif, "The Register" direction) read as more traditional/
+  document-office than current; swapped headings and the data/mono role to Geist/Geist Mono (both
+  available directly via `next/font/google`), keeping Inter for body copy since it was already
+  modern and nobody had a complaint about it specifically. Geist is a deliberate pick beyond just
+  "a modern sans" — it's Vercel's own typeface, and this app is deployed on Vercel, so it's a
+  genuine fit for the surface it runs on, not an arbitrary swap. `--font-heading` and `--font-mono`
+  in `globals.css` repointed accordingly; verified live via screenshot (login page, dashboard)
+  rather than assumed from the code.
+- **Em dashes removed from user-facing text.** Swept every `.ts`/`.tsx` file for em dashes (`—`)
+  outside comments (comments are internal documentation, not something a user of the platform
+  ever sees, and this codebase's comment style leans on them heavily — rewriting those would have
+  touched thousands of lines of historical reasoning for zero user-facing benefit, so left alone
+  deliberately) and rewrote each into plain punctuation that reads naturally (periods, commas,
+  colons, depending on what the sentence actually needed) rather than a blind find-replace.
+  Table-cell placeholder dashes (e.g. "no date set" shown as a dash) became a plain hyphen instead
+  of just deleting the visual cue entirely. Two intentional exceptions, left alone on purpose: the
+  em dash inside the candidate/invoice PDF templates (`lib/pdf/candidate-pdf.tsx`,
+  `lib/pdf/invoice-pdf.tsx`) is an exact character-for-character replication of the legacy PDF
+  format, which the user separately declared "cant change at all" — a stronger, more specific
+  instruction than this one, so it wins; and the `MIGRATION_MARKER` sentinel string in
+  `invoice-pdf.tsx` is never actually displayed to anyone (it's stripped out by `humanNotes()`
+  before rendering), so there was nothing to gain by editing it.
 
 ## Tech stack (exact)
 

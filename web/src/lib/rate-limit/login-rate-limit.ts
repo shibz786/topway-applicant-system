@@ -60,7 +60,7 @@ export async function recordLoginResult(
     if (alertEmail) {
       await email.send({
         to: alertEmail,
-        subject: "Account temporarily locked — repeated failed sign-in attempts",
+        subject: "Account temporarily locked: repeated failed sign-in attempts",
         body:
           `Your ${scope} account (${username}) was locked for 15 minutes after ${USERNAME_MAX_FAILS} ` +
           `consecutive failed sign-in attempts. If this wasn't you, consider changing your password ` +

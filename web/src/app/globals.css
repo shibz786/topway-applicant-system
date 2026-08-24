@@ -5,27 +5,28 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design tokens — Topway Private Limited. "The Register" direction.
+ * Design tokens - Topway Private Limited. "The Register" direction.
  *
  * The brand teal/ink is real, pre-existing identity (public/logo.png) and
- * is NOT up for reinvention — #16242c ink, #2b6f80 teal, sampled straight
- * from the mark. What changed in this pass (picked by the user from two
- * full mockup directions, see the "Redesign — Direction 2" entry in
- * CLAUDE.md) is everything else: this agency spends its day on passports,
- * licenses, and case files, so the palette leans into a warm stone/paper
- * ground instead of a cool grey porcelain one, and headings move to
- * Fraunces — a serif with real document-office gravitas — instead of a
- * geometric sans, paired with Inter for body/UI and IBM Plex Mono for
- * anything that's a figure or a reference number (invoice numbers,
- * passport numbers, KPI counts) so data reads as counted, not decorated.
+ * is NOT up for reinvention: #16242c ink, #2b6f80 teal, sampled straight
+ * from the mark. The palette (picked by the user from two full mockup
+ * directions, see the "Redesign - Direction 2" entry in CLAUDE.md) leans
+ * into a warm stone/paper ground instead of a cool grey porcelain one,
+ * since this agency spends its day on passports, licenses, and case
+ * files. Type: Geist for headings (a clean, current geometric sans - this
+ * app deploys on Vercel, whose own typeface it is, and it reads as
+ * distinctly more modern than the serif this direction started with)
+ * paired with Inter for body/UI and Geist Mono for anything that's a
+ * figure or a reference number (invoice numbers, passport numbers, KPI
+ * counts) so data reads as counted, not decorated.
  */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-plex-mono);
-  --font-heading: var(--font-fraunces);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-geist);
   --color-good: var(--good);
   --color-good-foreground: var(--good-foreground);
   --color-warn: var(--warn);

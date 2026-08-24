@@ -56,7 +56,7 @@ function DiffView({ diff }: { diff: unknown }) {
 }
 
 function fmt(v: unknown): string {
-  if (v === null || v === undefined) return "—";
+  if (v === null || v === undefined) return "-";
   if (typeof v === "string" && v.length > 40) return v.slice(0, 40) + "…";
   return String(v);
 }

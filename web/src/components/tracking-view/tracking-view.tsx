@@ -132,8 +132,8 @@ export function TrackingView({ user }: { user: SessionUser }) {
                         <Badge variant="secondary">{WORKER_CATEGORY_LABELS[r.category]}</Badge>
                       </TableCell>
                       <TableCell>{r.agentName ?? <span className="text-muted-foreground">Unassigned</span>}</TableCell>
-                      <TableCell>{r.destinationCountry ? DEST_COUNTRY_LABELS[r.destinationCountry] : "—"}</TableCell>
-                      <TableCell>{r.departureDate ? new Date(r.departureDate).toLocaleDateString() : "—"}</TableCell>
+                      <TableCell>{r.destinationCountry ? DEST_COUNTRY_LABELS[r.destinationCountry] : "-"}</TableCell>
+                      <TableCell>{r.departureDate ? new Date(r.departureDate).toLocaleDateString() : "-"}</TableCell>
                       <TableCell>
                         <ApplicationStatusChip status={r.applicationStatus} />
                       </TableCell>

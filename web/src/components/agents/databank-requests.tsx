@@ -58,7 +58,7 @@ export function DatabankRequests() {
     <Card>
       <CardHeader>
         <CardTitle>Pending Databank Requests</CardTitle>
-        <CardDescription>Agents requested assignment to these candidates — not self-service.</CardDescription>
+        <CardDescription>Agents requested assignment to these candidates. Not self-service.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {data.map((r) => (

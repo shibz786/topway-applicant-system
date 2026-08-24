@@ -197,8 +197,8 @@ export function CandidateDetailDialog({
                   {candidate.address && <Field label="Address" value={candidate.address} />}
                   <Field label="Years Experience" value={String(candidate.yearsExperience)} />
                   <Field label="Contract Duration" value={`${candidate.contractDuration} months`} />
-                  <Field label="Skills" value={candidate.skills.join(", ") || "—"} />
-                  <Field label="Languages" value={candidate.languages.join(", ") || "—"} />
+                  <Field label="Skills" value={candidate.skills.join(", ") || "-"} />
+                  <Field label="Languages" value={candidate.languages.join(", ") || "-"} />
 
                   {canEditProfile && !isAgent && (
                     <div className="flex items-center justify-between rounded-md border p-2 pt-2">
@@ -235,7 +235,7 @@ export function CandidateDetailDialog({
                     <div key={p.id} className="rounded-md border p-2 text-sm">
                       <p className="font-medium">
                         {p.agent.companyName} ({p.agent.country}){" "}
-                        {p.isCurrent && <span className="text-xs text-primary">— current</span>}
+                        {p.isCurrent && <span className="text-xs text-primary">(current)</span>}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(p.startDate).toLocaleDateString()} –{" "}

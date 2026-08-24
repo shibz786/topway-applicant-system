@@ -60,7 +60,7 @@ export default function LoginPage() {
             One record, from placement to contract close.
           </p>
           <p className="max-w-sm text-sm text-white/70">
-            Candidate profiles, visa pipeline, and agent placements — tracked in one place instead
+            Candidate profiles, visa pipeline, and agent placements, tracked in one place instead
             of a folder of spreadsheets.
           </p>
         </div>
@@ -120,7 +120,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-xs text-muted-foreground">Topway Private Limited — internal use only</p>
+        <p className="text-xs text-muted-foreground">Topway Private Limited, internal use only</p>
       </div>
     </div>
   );

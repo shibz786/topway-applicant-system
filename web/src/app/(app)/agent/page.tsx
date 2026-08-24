@@ -12,7 +12,7 @@ export default async function AgentPortalPage() {
       <div>
         <h1 className="font-heading text-xl font-semibold">My Applications</h1>
         <p className="text-sm text-muted-foreground">
-          Pipeline stages are read-only here — Topway staff manage the visa pipeline.
+          Pipeline stages are read-only here. Topway staff manage the visa pipeline.
         </p>
       </div>
       <MyApplications user={user} />

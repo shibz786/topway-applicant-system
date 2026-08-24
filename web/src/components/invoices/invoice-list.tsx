@@ -168,7 +168,7 @@ export function InvoiceList() {
                   {inv.currency} {inv.totalAmount.toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  {inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : "—"}
+                  {inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : "-"}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">

@@ -84,7 +84,7 @@ export function AgentManager() {
                 </TableCell>
                 <TableCell>{a.country}</TableCell>
                 <TableCell>{a._count.placements}</TableCell>
-                <TableCell>{a.dataBankAccess ? <Badge variant="secondary">Yes</Badge> : "—"}</TableCell>
+                <TableCell>{a.dataBankAccess ? <Badge variant="secondary">Yes</Badge> : "-"}</TableCell>
                 <TableCell>
                   {a.user.isActive ? <Badge variant="outline">Active</Badge> : <Badge variant="destructive">Inactive</Badge>}
                 </TableCell>

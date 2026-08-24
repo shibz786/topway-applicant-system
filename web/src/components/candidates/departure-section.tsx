@@ -58,7 +58,7 @@ export function DepartureSection({
       toast.error(res.error);
       return;
     }
-    toast.success("Departure recorded — probation and contract dates computed automatically");
+    toast.success("Departure recorded, probation and contract dates computed automatically");
     setOpen(false);
     onChanged();
     queryClient.invalidateQueries({ queryKey: ["candidates"] });
@@ -83,7 +83,7 @@ export function DepartureSection({
                   <DialogTitle>Set departure & destination</DialogTitle>
                   <DialogDescription>
                     Both must be set together. Probation, mid-contract, and contract-end dates are
-                    computed automatically from these — never entered manually.
+                    computed automatically from these, never entered manually.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2">
@@ -140,8 +140,8 @@ export function DepartureSection({
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Mid-contract: {contractMidDate ? new Date(contractMidDate).toLocaleDateString() : "—"} · Contract
-            end: {contractEndDate ? new Date(contractEndDate).toLocaleDateString() : "—"}
+            Mid-contract: {contractMidDate ? new Date(contractMidDate).toLocaleDateString() : "-"} · Contract
+            end: {contractEndDate ? new Date(contractEndDate).toLocaleDateString() : "-"}
           </p>
         </div>
       )}
