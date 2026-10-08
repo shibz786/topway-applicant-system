@@ -7,6 +7,7 @@ import { listAgentsForInvoice } from "@/lib/actions/invoices";
 import {
   WORKER_CATEGORY_LABELS,
   DEST_COUNTRY_LABELS,
+  DEST_COUNTRY_FLAGS,
   DISPUTE_TYPE_LABELS,
   deriveProbationStatus,
   deriveContractStage,
@@ -177,12 +178,18 @@ function CandidateRow({ row, onClick }: { row: CandidateListRow; onClick: () => 
         </Avatar>
       </TableCell>
       <TableCell className="font-medium">
-        {row.fullName}
-        {row.hasActiveDispute && (
-          <span className="ml-2 inline-block align-middle">
-            <DisputeChip label={disputeChipLabel(row.activeDisputeTypes)} />
-          </span>
-        )}
+        <div>
+          {row.fullName}
+          {row.hasActiveDispute && (
+            <span className="ml-2 inline-block align-middle">
+              <DisputeChip label={disputeChipLabel(row.activeDisputeTypes)} />
+            </span>
+          )}
+        </div>
+        {/* Reference line, in the style of a passport's own machine-readable
+            zone — "The Manifest" direction's signature detail, since every
+            record here really does have a passport on file. */}
+        <div className="font-mono text-[11px] text-muted-foreground">PP {row.passportNumber}</div>
       </TableCell>
       <TableCell>
         <Badge variant="secondary">{WORKER_CATEGORY_LABELS[row.category]}</Badge>
@@ -197,7 +204,16 @@ function CandidateRow({ row, onClick }: { row: CandidateListRow; onClick: () => 
         )}
       </TableCell>
       <TableCell>{row.agentName ?? <span className="text-muted-foreground">Unassigned</span>}</TableCell>
-      <TableCell>{row.destinationCountry ? DEST_COUNTRY_LABELS[row.destinationCountry] : "-"}</TableCell>
+      <TableCell>
+        {row.destinationCountry ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden>{DEST_COUNTRY_FLAGS[row.destinationCountry]}</span>
+            {DEST_COUNTRY_LABELS[row.destinationCountry]}
+          </span>
+        ) : (
+          "-"
+        )}
+      </TableCell>
       <TableCell>{row.departureDate ? new Date(row.departureDate).toLocaleDateString() : "-"}</TableCell>
       <TableCell>
         <ApplicationStatusChip status={row.applicationStatus} />

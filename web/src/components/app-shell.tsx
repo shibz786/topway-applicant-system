@@ -48,23 +48,26 @@ function navItemsFor(user: SessionUser): NavItem[] {
 
 const ROLE_LABEL: Record<string, string> = { ADMIN: "Admin", STAFF: "Staff", AGENT: "Agent" };
 
-// "The Register" shell: a teal-deep masthead (brand + who-you-are) with a
-// row of folder-style tabs underneath, styled to look like index tabs on a
-// case file — the active tab visually fuses with the page's own paper
-// background below it. Replaces the old single dark pill-bar, which had no
-// real answer for what happens once nav grows past ~6 items — this scales
-// the same way a real folder does: more tabs, same row, scrolls on mobile.
+// "The Manifest" shell. The masthead is real glass, not a flat panel —
+// semi-transparent brand ink with backdrop-blur, so content scrolling
+// underneath it is genuinely visible through the bar. This is one of the
+// two places this redesign uses glassmorphism (see the mockup artifact's
+// own reasoning): a sticky header has something to blur by construction,
+// unlike a dense table or KPI tile where blur would fight legibility. The
+// folder-tab row underneath (active tab fuses with the page's own paper
+// background) is unchanged in concept from "The Register" — that idea
+// wasn't the part the user rejected, the typography and palette were.
 export function AppShell({ user, children }: { user: SessionUser; children: React.ReactNode }) {
   const pathname = usePathname();
   const navItems = navItemsFor(user);
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 bg-[#1c4a56]">
+      <header className="sticky top-0 z-10 border-b border-white/8 bg-brand-ink/80 supports-backdrop-filter:backdrop-blur-md supports-backdrop-filter:backdrop-saturate-150">
         <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
           <Link href="/dashboard" className="flex shrink-0 items-center gap-2.5">
             <Image src="/mark.png" alt="" width={20} height={19} priority className="brightness-0 invert" />
-            <span className="hidden font-heading text-[16px] font-semibold tracking-tight text-white sm:inline">
+            <span className="hidden text-[16px] font-semibold tracking-tight text-white sm:inline">
               Topway
             </span>
           </Link>
@@ -87,7 +90,7 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
                 href={item.href}
                 className={cn(
                   "shrink-0 rounded-t-md px-4 py-2 font-mono text-[11.5px] font-medium tracking-wide whitespace-nowrap transition-colors",
-                  active ? "bg-background font-semibold text-[#1c4a56]" : "text-white/60 hover:bg-white/10 hover:text-white",
+                  active ? "bg-background font-semibold text-brand-ink" : "text-white/60 hover:bg-white/10 hover:text-white",
                 )}
               >
                 {item.label}

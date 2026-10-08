@@ -15,6 +15,15 @@ export const DEST_COUNTRY_LABELS: Record<DestCountry, string> = {
   QATAR: "Qatar",
 };
 
+// "The Manifest" direction shows destination as a flag, not just text —
+// the one piece of information every placement actually revolves around.
+export const DEST_COUNTRY_FLAGS: Record<DestCountry, string> = {
+  SAUDI_ARABIA: "🇸🇦",
+  KUWAIT: "🇰🇼",
+  OMAN: "🇴🇲",
+  QATAR: "🇶🇦",
+};
+
 export const WORKER_CATEGORY_LABELS = {
   FIRST_TIMER: "First Timer",
   EXPERIENCED: "Experienced",

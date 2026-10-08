@@ -845,6 +845,58 @@ under Phase 0 below — build the new one.
   checked (most likely Topway's own SLBFE license/status as the Sri Lanka-based licensee, a
   company-level check rather than a per-Agent one) before writing the scraper itself. **Not yet
   built** — do not add Agent-level SLBFE fields/scraping until that's resolved.
+- **Redesign, "The Manifest" direction, applied live.** The user asked to "elevate" the platform
+  to feel top notch, keeping the same business logic, portals, and data, and explicitly not
+  touching the candidate CV or invoice PDF templates. Process mirrored the earlier successful
+  redesign: built mockup directions as an Artifact before touching live code, not after. First
+  pass (two directions, "The Bureau" and "Command") was rejected outright: "too AI generic," plus
+  two new standing rules the user gave directly: never use em dashes anywhere, in chat, UI copy,
+  code comments, or documentation, and always use a standard, clear, easy-to-read font, never a
+  display serif or a stylized accent face. Both are now saved as persistent memory, not just
+  applied to this one pass. Rebuilt as a single direction, "The Manifest," grounded in what the
+  platform actually processes, passports, visas, destinations, placements, rather than in an
+  unusual typeface or a decorative palette, specifically to avoid the AI-generic defaults the
+  first pass fell into (warm cream plus display serif; near-black plus a single neon accent).
+  The user then asked for glassmorphism specifically, applied selectively: a real frosted top bar,
+  and dialogs/alert dialogs as genuine floating glass panels over a dimmed, blurred backdrop,
+  kept solid and opaque everywhere dense data lives (KPI tiles, the candidates table) since blur
+  behind small figures and reference codes would fight the "easy to read" rule. Applied to the
+  live app after the user approved with "move forwrd":
+  - **Tokens** (`globals.css`): neutral paper and graphite ground replaces the previous warm stone
+    paper, real brand teal (`#1f6475`, the same mark color, not reinvented) as the one accent,
+    `--radius` reduced for a crisper, document-like feel instead of rounded-everywhere. Full dark
+    variant rebuilt alongside, not just the light side, per this project's own standing rule.
+  - **Type** (`layout.tsx`, `globals.css`): Geist and Geist Mono replaced with Inter and IBM Plex
+    Mono. `--font-heading` now resolves to the same Inter variable as `--font-sans` rather than a
+    separate display face, so the roughly 23 existing `font-heading` call sites across the app
+    didn't need touching, the token layer absorbed the whole change, same leverage this project's
+    design passes have relied on before.
+  - **Badge** (`badge.tsx`): one change, `rounded-4xl` to `rounded-sm`, turns every status chip
+    across the app (disputes, invoice advance, blacklist, application status) from a rounded pill
+    into a square manifest-style tag, without touching each call site individually.
+  - **Glassmorphism** (`dialog.tsx`, `alert-dialog.tsx`, `app-shell.tsx`): dialog and alert-dialog
+    content now use `backdrop-blur-xl` plus a translucent `bg-popover/75` (guarded by
+    `supports-backdrop-filter` for the opaque fallback), with their overlays dimming and blurring
+    what's behind them, so a real floating-glass effect reads correctly rather than just a flat
+    translucent card. The masthead (`app-shell.tsx`) is a frosted `bg-brand-ink/80` bar with its
+    own backdrop blur, sitting over a new, deliberately faint radial-gradient body background
+    (`globals.css`) added specifically so the glass has something real to blur against.
+  - **Manifest signature details**: candidate records show a destination flag
+    (`DEST_COUNTRY_FLAGS` in `business/tracking.ts`) and a monospace passport reference line
+    (`PP {passportNumber}`) in both the candidates table (`candidate-table.tsx`) and the candidate
+    detail dialog's header (`candidate-detail-dialog.tsx`), in the style of a travel document's
+    own data strip. `listCandidatesInternal()` (`actions/candidates.ts`) now also returns
+    `passportNumber`, which it hadn't needed to before this. The detail dialog's functional
+    sections underneath, pipeline stepper, departure/destination, tabs, agent assignment, stayed
+    completely untouched: only the header was redesigned, since rebuilding a dialog this dense
+    and this relied-on, just to fit a mockup's simplified preview concept, would have risked
+    breaking real working functionality for a cosmetic win.
+  **Verified live, not just typechecked**: screenshotted login, dashboard, the candidates table,
+  the candidate detail dialog with its glass treatment clearly visible against a blurred
+  backdrop, invoices, and the blacklist portal, each in both light and dark color schemes, plus
+  the agent portal at a real 375px mobile viewport. Confirmed via `git status` that neither PDF
+  template file was touched. The mockup Artifact itself, and the scratch HTML file backing it,
+  were cleaned up once the direction was approved and shipped, not left as clutter in the repo.
 
 ## Tech stack (exact)
 

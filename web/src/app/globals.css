@@ -5,28 +5,43 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design tokens - Topway Private Limited. "The Register" direction.
+ * Design tokens - Topway Private Limited. "The Manifest" direction.
  *
  * The brand teal/ink is real, pre-existing identity (public/logo.png) and
  * is NOT up for reinvention: #16242c ink, #2b6f80 teal, sampled straight
- * from the mark. The palette (picked by the user from two full mockup
- * directions, see the "Redesign - Direction 2" entry in CLAUDE.md) leans
- * into a warm stone/paper ground instead of a cool grey porcelain one,
- * since this agency spends its day on passports, licenses, and case
- * files. Type: Geist for headings (a clean, current geometric sans - this
- * app deploys on Vercel, whose own typeface it is, and it reads as
- * distinctly more modern than the serif this direction started with)
- * paired with Inter for body/UI and Geist Mono for anything that's a
- * figure or a reference number (invoice numbers, passport numbers, KPI
- * counts) so data reads as counted, not decorated.
+ * from the mark. Replaces "The Register" (warm stone paper, Fraunces
+ * display serif, Geist/Geist Mono) after the user rejected a follow-up
+ * mockup pass as "too AI generic" and gave two standing rules: never use
+ * em dashes, and always use a standard, clear, easy-to-read font - no
+ * display serif, no stylized accent face. This direction is grounded in
+ * what the platform actually processes (travel documents, placements,
+ * destinations) rather than in an unusual typeface or a decorative
+ * palette - see the approved mockup, "Topway: Elevated Design
+ * Directions" artifact, for the full reasoning and the two rejected
+ * directions that preceded it.
+ *
+ * Type: Inter for everything, headings and body alike (--font-heading
+ * now resolves to the same face as --font-sans, not a separate display
+ * font - the token stays so the ~23 existing `font-heading` call sites
+ * don't need touching). IBM Plex Mono, a standard monospace rather than
+ * a stylized one, for anything that's a figure or reference code
+ * (invoice numbers, passport numbers, KPI counts) so data reads as
+ * counted, not decorated.
+ *
+ * Ground shifts from warm stone paper to a neutral paper/graphite base -
+ * the warm-cream-plus-serif combination the previous attempt used is
+ * itself a well-known AI-generated-design default, worth avoiding on
+ * purpose, not just coincidentally. Status reads as a square tag
+ * (--radius-sm, not a rounded pill - see badge.tsx) in the style of a
+ * manifest or customs form, not a wax-seal stamp or a SaaS pill badge.
  */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist);
+  --font-mono: var(--font-plex-mono);
+  --font-heading: var(--font-inter);
   --color-good: var(--good);
   --color-good-foreground: var(--good-foreground);
   --color-warn: var(--warn);
@@ -76,91 +91,92 @@
 
 :root {
   /* Brand primitives — the mark's own colors, named, kept stable across
-     light/dark so gradients and one-off brand moments (login screen) can
-     reach for them directly instead of the semantic (and per-mode) tokens
-     below. */
+     light/dark so gradients and one-off brand moments (login screen,
+     masthead glass) can reach for them directly instead of the semantic
+     (and per-mode) tokens below. Unchanged from "The Register" - real
+     logo colors are not up for reinvention regardless of direction. */
   --brand-ink: #16242c;
   --brand-teal: #2b6f80;
   --brand-teal-deep: #1c4a56;
   --brand-teal-bright: #4fa3b8;
 
-  --background: #f1efe9; /* warm stone paper — not a straight cream */
-  --foreground: #20302e; /* teal-black ink */
-  --card: #fbfaf7;
-  --card-foreground: #20302e;
-  --popover: #fbfaf7;
-  --popover-foreground: #20302e;
-  --primary: #2b6f80; /* brand teal */
-  --primary-foreground: #f7fbfc;
-  --secondary: #e8e2d3;
-  --secondary-foreground: #29332f;
-  --muted: #eae4d6;
-  --muted-foreground: #767e70;
-  --accent: #e1ece8;
-  --accent-foreground: #1c4a56;
-  --destructive: #a3402f;
-  --border: #d9d3c4;
-  --input: #d3cbb6;
-  --ring: #2b6f80;
-  --good: #3d7a52;
+  --background: #f6f6f4; /* neutral paper — not warm cream, not cool porcelain */
+  --foreground: #15181c;
+  --card: #ffffff;
+  --card-foreground: #15181c;
+  --popover: #ffffff;
+  --popover-foreground: #15181c;
+  --primary: #1f6475; /* brand teal, slightly deepened for AA contrast on white cards */
+  --primary-foreground: #f5f9fa;
+  --secondary: #ebede9;
+  --secondary-foreground: #15181c;
+  --muted: #ebede9;
+  --muted-foreground: #5b6066;
+  --accent: #e3edee;
+  --accent-foreground: #1f6475;
+  --destructive: #a3362a;
+  --border: #dfe2de;
+  --input: #dfe2de;
+  --ring: #1f6475;
+  --good: #2f7a4f;
   --good-foreground: #f4faf5;
-  --warn: #a06a2e;
-  --warn-foreground: #fdf8f0;
-  --critical: #a3402f;
+  --warn: #9a6a14;
+  --warn-foreground: #fdf8ec;
+  --critical: #a3362a;
   --critical-foreground: #fdf3f1;
-  --chart-1: #2b6f80;
-  --chart-2: #1c4a56;
+  --chart-1: #1f6475;
+  --chart-2: #16242c;
   --chart-3: #7fa89c;
-  --chart-4: #a06a2e;
+  --chart-4: #9a6a14;
   --chart-5: #c9903f;
-  --radius: 0.6rem;
-  --sidebar: #eae4d6;
-  --sidebar-foreground: #20302e;
-  --sidebar-primary: #2b6f80;
-  --sidebar-primary-foreground: #f7fbfc;
-  --sidebar-accent: #e1ece8;
-  --sidebar-accent-foreground: #1c4a56;
-  --sidebar-border: #d9d3c4;
-  --sidebar-ring: #2b6f80;
+  --radius: 0.4rem; /* crisper, more document/manifest than rounded-everywhere */
+  --sidebar: #ebede9;
+  --sidebar-foreground: #15181c;
+  --sidebar-primary: #1f6475;
+  --sidebar-primary-foreground: #f5f9fa;
+  --sidebar-accent: #e3edee;
+  --sidebar-accent-foreground: #1f6475;
+  --sidebar-border: #dfe2de;
+  --sidebar-ring: #1f6475;
 }
 
 .dark {
-  --background: #171c19; /* warm near-black, teal-green cast — not a neutral gray */
-  --foreground: #eae7de;
-  --card: #1f2521;
-  --card-foreground: #eae7de;
-  --popover: #1f2521;
-  --popover-foreground: #eae7de;
-  --primary: #5fb3c6; /* brighter teal — holds contrast on the dark stone surface */
-  --primary-foreground: #10181a;
-  --secondary: #2a2f29;
-  --secondary-foreground: #eae7de;
-  --muted: #262b25;
-  --muted-foreground: #9aa397;
-  --accent: #29393a;
-  --accent-foreground: #b9e0e7;
+  --background: #121416; /* neutral graphite — not warm, not a teal-green cast */
+  --foreground: #e7e9e7;
+  --card: #1a1d1f;
+  --card-foreground: #e7e9e7;
+  --popover: #1a1d1f;
+  --popover-foreground: #e7e9e7;
+  --primary: #5fb3c6; /* brighter teal — holds contrast on dark graphite */
+  --primary-foreground: #0c1314;
+  --secondary: #24282b;
+  --secondary-foreground: #e7e9e7;
+  --muted: #202326;
+  --muted-foreground: #9aa0a3;
+  --accent: #223033;
+  --accent-foreground: #9bd3df;
   --destructive: #d47a63;
-  --border: rgba(234, 227, 216, 0.12);
-  --input: rgba(234, 227, 216, 0.16);
+  --border: rgba(231, 233, 231, 0.1);
+  --input: rgba(231, 233, 231, 0.14);
   --ring: #5fb3c6;
   --good: #5fa878;
-  --good-foreground: #10180f;
+  --good-foreground: #0c140c;
   --warn: #c99552;
-  --warn-foreground: #1a130a;
+  --warn-foreground: #180f05;
   --critical: #d47a63;
-  --critical-foreground: #1c0f0a;
+  --critical-foreground: #1a0d09;
   --chart-1: #5fb3c6;
   --chart-2: #2b6f80;
   --chart-3: #7fa89c;
   --chart-4: #c99552;
   --chart-5: #d9a35b;
-  --sidebar: #1f2521;
-  --sidebar-foreground: #eae7de;
+  --sidebar: #1a1d1f;
+  --sidebar-foreground: #e7e9e7;
   --sidebar-primary: #5fb3c6;
-  --sidebar-primary-foreground: #10181a;
-  --sidebar-accent: #29393a;
-  --sidebar-accent-foreground: #b9e0e7;
-  --sidebar-border: rgba(234, 227, 216, 0.12);
+  --sidebar-primary-foreground: #0c1314;
+  --sidebar-accent: #223033;
+  --sidebar-accent-foreground: #9bd3df;
+  --sidebar-border: rgba(231, 233, 231, 0.1);
   --sidebar-ring: #5fb3c6;
 }
 
@@ -170,6 +186,14 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Faint brand-teal tint, fixed so it doesn't scroll with the page —
+       gives the masthead's glass (see app-shell.tsx) something real to
+       blur. Deliberately subtle: a loud gradient here is its own
+       AI-generated-design tell, the same one the rejected "near-black
+       plus neon accent" direction leaned on. */
+    background-image: radial-gradient(640px 320px at 85% -6%, color-mix(in oklab, var(--brand-teal) 7%, transparent), transparent 70%),
+      radial-gradient(520px 280px at 6% 10%, color-mix(in oklab, var(--brand-teal) 4%, transparent), transparent 70%);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;

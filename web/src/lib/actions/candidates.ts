@@ -71,6 +71,7 @@ async function listCandidatesInternal(user: Awaited<ReturnType<typeof requireSes
       return {
         id: r.id,
         fullName: r.fullName,
+        passportNumber: r.passportNumber,
         category: r.category,
         applicationStatus: r.tracking?.applicationStatus ?? "ACTIVE",
         currentPipelineStep: currentStep?.label ?? null,

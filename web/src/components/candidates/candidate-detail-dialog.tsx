@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { getCandidate } from "@/lib/actions/candidates";
 import { setPipelineDate } from "@/lib/actions/tracking";
 import { toggleCandidateDatabank } from "@/lib/actions/agent-portal";
-import { WORKER_CATEGORY_LABELS, type PipelineStepKey } from "@/lib/business/tracking";
+import { WORKER_CATEGORY_LABELS, DEST_COUNTRY_LABELS, DEST_COUNTRY_FLAGS, type PipelineStepKey } from "@/lib/business/tracking";
 import type { SessionUser } from "@/lib/auth/session";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -97,14 +97,32 @@ export function CandidateDetailDialog({
         )}
         {candidate && (
           <>
+            {/* Header styled like a travel document's own data strip — the
+                signature detail of "The Manifest" direction, applied here
+                rather than restructuring this dialog's working tabs/
+                sections below, which stay exactly as they were. */}
             <DialogHeader className="border-b bg-muted/40 px-6 py-4">
-              <DialogTitle className="flex items-center gap-2 text-lg">
-                {candidate.fullName}
-                {candidate.tracking && <ApplicationStatusChip status={candidate.tracking.applicationStatus} />}
-              </DialogTitle>
-              <DialogDescription>
-                {candidate.nationality} · {WORKER_CATEGORY_LABELS[candidate.category]}
-              </DialogDescription>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <DialogTitle className="flex items-center gap-2 text-lg">
+                    {candidate.fullName}
+                    {candidate.tracking && <ApplicationStatusChip status={candidate.tracking.applicationStatus} />}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {candidate.nationality} · {WORKER_CATEGORY_LABELS[candidate.category]}
+                  </DialogDescription>
+                </div>
+                {candidate.tracking?.destinationCountry && (
+                  <span className="inline-flex items-center gap-1.5 text-sm">
+                    <span aria-hidden>{DEST_COUNTRY_FLAGS[candidate.tracking.destinationCountry]}</span>
+                    {DEST_COUNTRY_LABELS[candidate.tracking.destinationCountry]}
+                  </span>
+                )}
+              </div>
+              <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+                PP {candidate.passportNumber}
+                {candidate.idNumber && <> · ID {candidate.idNumber}</>}
+              </div>
             </DialogHeader>
 
             <div className="space-y-5 px-6 pb-6">
