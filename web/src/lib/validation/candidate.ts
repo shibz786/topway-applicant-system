@@ -20,6 +20,17 @@ export const personalDetailsSchema = z.object({
 });
 export type PersonalDetailsInput = z.infer<typeof personalDetailsSchema>;
 
+// A single prior overseas placement — country worked in is the field the
+// CV actually needs to show; role/years are supporting detail. Real work
+// history, not a legacy field (see the WorkExperience model comment in
+// schema.prisma for why this is new, not migrated).
+export const workExperienceEntrySchema = z.object({
+  id: z.string().optional(), // present when editing an existing entry
+  country: z.string().trim().min(1, "Country is required").max(100),
+  role: z.string().trim().max(100).optional(),
+  years: z.number().int().min(0).max(40),
+});
+
 // Step 2 — experience & skills.
 export const experienceSkillsSchema = z.object({
   category: workerCategorySchema,
@@ -27,6 +38,7 @@ export const experienceSkillsSchema = z.object({
   languages: z.array(z.string()),
   yearsExperience: z.number().int().min(0).max(60),
   contractDuration: z.number().int().min(1).max(120), // months, typically 24
+  workHistory: z.array(workExperienceEntrySchema),
 });
 export type ExperienceSkillsInput = z.infer<typeof experienceSkillsSchema>;
 

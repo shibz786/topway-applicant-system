@@ -159,6 +159,7 @@ model Candidate {
   invoiceItems     InvoiceItem[]
   notifications    Notification[]
   auditLogs        AuditLog[]
+  workHistory      WorkExperience[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -166,6 +167,26 @@ model Candidate {
   @@index([passportNumber])
   @@index([idNumber])
   @@index([inDatabank])
+}
+
+// A real gap, not a legacy feature that got dropped: neither the legacy
+// index.html CV nor the original schema ever tracked prior overseas work
+// history at all, only a single yearsExperience count. The user asked
+// directly for this (multiple real prior placements, not just a number,
+// plus the countries worked in surfaced on the CV), so it's new content,
+// not a migration. One candidate can have several past placements, each
+// with its own destination country, hence a real child table rather than
+// another array column on Candidate.
+model WorkExperience {
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  country     String
+  role        String? // e.g. "Housemaid", "Nanny" — optional, not every record will have it
+  years       Int // whole years, matches the granularity yearsExperience already used
+  createdAt   DateTime  @default(now())
+
+  @@index([candidateId])
 }
 
 model Tracking {

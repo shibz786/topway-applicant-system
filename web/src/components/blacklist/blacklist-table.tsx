@@ -8,10 +8,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 export function BlacklistTable() {
   const [query, setQuery] = useState("");
+  const [openEntry, setOpenEntry] = useState<BlacklistEntry | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["blacklist"],
@@ -65,9 +67,54 @@ export function BlacklistTable() {
       </p>
       <div className="space-y-3">
         {filtered.map((entry) => (
-          <BlacklistCard key={entry.candidateId} entry={entry} />
+          <BlacklistCard key={entry.candidateId} entry={entry} onOpen={() => setOpenEntry(entry)} />
         ))}
       </div>
+
+      <Dialog open={!!openEntry} onOpenChange={(open) => !open && setOpenEntry(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+          {openEntry && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{openEntry.fullName}</DialogTitle>
+                <DialogDescription>
+                  {openEntry.nationality} · {WORKER_CATEGORY_LABELS[openEntry.category]} · Passport{" "}
+                  {openEntry.passportNumber}
+                  {openEntry.idNumber ? ` · ID ${openEntry.idNumber}` : ""}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                {openEntry.disputes.map((d) => (
+                  <div key={d.id} className="rounded-md border p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{d.typeLabel}</span>
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {new Date(d.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {d.notes && <p className="mt-1 text-muted-foreground">{d.notes}</p>}
+                    <p className="mt-1 text-xs">
+                      {d.resolvedAt ? (
+                        <span className="text-good">Resolved {new Date(d.resolvedAt).toLocaleDateString()}</span>
+                      ) : (
+                        <span className="text-critical">Unresolved</span>
+                      )}
+                    </p>
+                    <div className="mt-2 border-t pt-2">
+                      <AgentAttribution
+                        name={d.agentName}
+                        country={d.agentCountry}
+                        licenseNo={d.agentLicenseNo}
+                        contactNo={d.agentContactNo}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -104,10 +151,14 @@ function AgentAttribution({
   );
 }
 
-function BlacklistCard({ entry }: { entry: BlacklistEntry }) {
+function BlacklistCard({ entry, onOpen }: { entry: BlacklistEntry; onOpen: () => void }) {
   return (
     <Card className="gap-0 overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-4 py-3">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-4 py-3 text-left transition-colors hover:bg-muted/70"
+      >
         <div className="flex flex-wrap items-center gap-2.5">
           <p className="font-heading font-semibold">{entry.fullName}</p>
           <Badge variant="secondary" className="text-xs">
@@ -125,7 +176,7 @@ function BlacklistCard({ entry }: { entry: BlacklistEntry }) {
         >
           {entry.hasUnresolvedDispute ? "Open dispute" : "Resolved history"} · {entry.disputeCount}
         </Badge>
-      </div>
+      </button>
       <div className="divide-y">
         {entry.disputes.map((d) => (
           <div key={d.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 text-sm">

@@ -111,6 +111,7 @@ async function getCandidateInternal(id: string) {
         orderBy: { startDate: "desc" },
         include: { agent: { select: { id: true, companyName: true, country: true } } },
       },
+      workHistory: { orderBy: { createdAt: "asc" } },
     },
   });
 }
@@ -235,7 +236,27 @@ export async function updateCandidateExperience(
     const existing = await db.candidate.findUnique({ where: { id } });
     if (!existing) throw new ActionError("Candidate not found");
 
-    await runAsActor(user, () => db.candidate.update({ where: { id }, data }));
+    // workHistory is a child table, not a scalar column — a plain
+    // db.candidate.update({ data }) with it inline would fail, since
+    // Prisma needs nested-write shape (deleteMany + create) to replace a
+    // relation wholesale. Same array-batch pattern updateInvoice() already
+    // uses for its line items, for the same pooling-mode reason (see the
+    // datasource comment in schema.prisma).
+    const { workHistory, ...scalarData } = data;
+    await runAsActor(user, () =>
+      db.$transaction([
+        db.workExperience.deleteMany({ where: { candidateId: id } }),
+        db.candidate.update({
+          where: { id },
+          data: {
+            ...scalarData,
+            workHistory: {
+              create: workHistory.map((w) => ({ country: w.country, role: w.role || null, years: w.years })),
+            },
+          },
+        }),
+      ]),
+    );
     return null;
   });
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -272,10 +272,11 @@ function ExperienceSkillsStep({
   onDone: () => void;
 }) {
   const {
+    register,
     handleSubmit,
     control,
     reset,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm<ExperienceSkillsInput>({
     resolver: zodResolver(experienceSkillsSchema),
     defaultValues: {
@@ -284,7 +285,13 @@ function ExperienceSkillsStep({
       languages: [],
       yearsExperience: 0,
       contractDuration: 24,
+      workHistory: [],
     },
+  });
+
+  const { fields: workFields, append: appendWork, remove: removeWork } = useFieldArray({
+    control,
+    name: "workHistory",
   });
 
   useEffect(() => {
@@ -295,6 +302,12 @@ function ExperienceSkillsStep({
         languages: existing.languages,
         yearsExperience: existing.yearsExperience,
         contractDuration: existing.contractDuration,
+        workHistory: existing.workHistory.map((w) => ({
+          id: w.id,
+          country: w.country,
+          role: w.role ?? "",
+          years: w.years,
+        })),
       });
     }
   }, [existing, reset]);
@@ -373,6 +386,51 @@ function ExperienceSkillsStep({
 
           <CheckboxGroup control={control} name="skills" label="Skills" options={SKILL_OPTIONS} />
           <CheckboxGroup control={control} name="languages" label="Languages" options={LANGUAGE_OPTIONS} />
+
+          <div className="space-y-2">
+            <Label>Work experience</Label>
+            <p className="text-xs text-muted-foreground">
+              Prior overseas placements. The country worked in shows on the CV.
+            </p>
+            <div className="space-y-2">
+              {workFields.map((field, index) => (
+                <div key={field.id} className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1.2fr_1fr_0.7fr_auto]">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Country</Label>
+                    <Input {...register(`workHistory.${index}.country`)} />
+                    {errors.workHistory?.[index]?.country && (
+                      <p className="text-xs text-destructive">{errors.workHistory[index]?.country?.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Role (optional)</Label>
+                    <Input {...register(`workHistory.${index}.role`)} placeholder="e.g. Housemaid" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Years</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      {...register(`workHistory.${index}.years`, { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeWork(index)}>
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => appendWork({ country: "", role: "", years: 0 })}
+            >
+              + Add prior placement
+            </Button>
+          </div>
 
           <div className="flex justify-between">
             <Button type="button" variant="outline" onClick={onBack}>

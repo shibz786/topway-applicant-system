@@ -218,6 +218,28 @@ export function CandidateDetailDialog({
                   <Field label="Contract Duration" value={`${candidate.contractDuration} months`} />
                   <Field label="Skills" value={candidate.skills.join(", ") || "-"} />
                   <Field label="Languages" value={candidate.languages.join(", ") || "-"} />
+                  <Field
+                    label="Countries Worked In"
+                    value={[...new Set(candidate.workHistory.map((w) => w.country))].join(", ") || "-"}
+                  />
+                  {candidate.workHistory.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <span className="text-xs uppercase text-muted-foreground">Work History</span>
+                      <div className="space-y-1">
+                        {candidate.workHistory.map((w) => (
+                          <div key={w.id} className="flex justify-between rounded-md border px-2 py-1 text-xs">
+                            <span>
+                              {w.role ? `${w.role}, ` : ""}
+                              {w.country}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {w.years} year{w.years === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {canEditProfile && !isAgent && (
                     <div className="flex items-center justify-between rounded-md border p-2 pt-2">

@@ -897,6 +897,77 @@ under Phase 0 below — build the new one.
   the agent portal at a real 375px mobile viewport. Confirmed via `git status` that neither PDF
   template file was touched. The mockup Artifact itself, and the scratch HTML file backing it,
   were cleaned up once the direction was approved and shipped, not left as clutter in the repo.
+- **Blacklist open bug, candidate work history, dummy foreign agents, full data scrub — done.**
+  Six items from one user message, the last four with real attached logo images for the foreign
+  agencies.
+  - **Blacklist entries couldn't be opened**: `BlacklistCard` had zero click handlers at all,
+    purely static display. Deliberately did NOT reuse the standard `CandidateDetailDialog` (which
+    calls `getCandidate()` → `assertCanViewCandidate()`) since that throws `ForbiddenError` for an
+    agent opening another agency's blacklisted candidate, breaking the portal's intentional
+    cross-agency visibility. Built a dedicated `Dialog` in `blacklist-table.tsx` instead, re-
+    presenting data `listBlacklist()` already fetched (same permission scope, no new access-control
+    surface), showing full dispute history and agent attribution per candidate.
+  - **Candidate work history**: neither legacy data nor the original schema ever tracked prior
+    overseas placements, only a single `yearsExperience` count, so this is new content, not a
+    migration. New `WorkExperience` model (country/role/years, cascades on candidate delete),
+    `updateCandidateExperience()` rewritten to replace the relation via the project's established
+    array-batch `$transaction([deleteMany, update])` pattern wrapped in `runAsActor()` (not the
+    interactive callback form, consistent with the PgBouncer transaction-pooling constraint
+    documented on the `schema.prisma` datasource block). Wizard UI uses `useFieldArray` for
+    repeatable country/role/years rows, matching the pattern invoice line items already used.
+    **Candidate PDF**: found the legacy template already had an "Employment Record & Language
+    Skills" table with a `Position | Country | Period` layout that had always rendered exactly one
+    hardcoded blank placeholder row, an existing legacy slot that had simply never been fed real
+    data, not a new layout. Populated it, plus added a "Countries Worked In" field under
+    Nationality (`[...new Set(workHistory.map(w => w.country))].join(", ")`). Verified by rendering
+    an actual candidate's PDF to PNG (PyMuPDF) and confirming both the countries line and a real
+    two-row employment table render correctly, not just that the route returns 200.
+  - **Dummy foreign agents**: the user attached 6 real logo images (FalconGate/UAE, Palm Crest/
+    Saudi Arabia, Cedar Link Overseas/Kuwait, Desert Wave Staffing/Oman, Al Noor Horizon/Qatar,
+    Pearl Bridge Recruitment/Bahrain). Found mid-task that 5 of 6 already existed from undetermined
+    earlier work with partial data (some missing logos, some missing license/contact) — inventoried
+    the actual DB state before touching anything rather than assuming a clean slate, then created
+    only what was missing (Pearl Bridge) and filled only the missing fields on the rest, via
+    `storage.putObject(randomUUID(), buffer, mimeType)` following the exact upload pattern
+    `documents.ts` already used. A company-name mismatch in the completion script ("Falcon Gate
+    Recruitment" vs. the existing "Falcon Gate") briefly created a duplicate agent record; caught
+    it immediately by re-querying rather than assuming the script's own success output, merged the
+    uploaded logo onto the real record, and deleted the duplicate. Also found and fixed display-
+    level leftovers from that same earlier work: 5 of the 6 agents' underlying `User.name` was
+    still a test-artifact string ("Hussain (grma)", "Mr.Abdullah (boom)") visible right on the
+    `/admin/agents` table, replaced with plausible contact names, username/email left untouched.
+  - **Full data scrub for the customer demo**: deleted 6 obvious junk/test candidate records (a
+    blank-field entry, a minimal test entry, and four auto-generated "P4/P5 Candidate `<hash>`"
+    fixtures tied to the junk agents below) after confirming each had zero disputes/invoice items/
+    documents — deleted in FK-safe order (AuditLog, Notification, Dispute, Document, Placement,
+    WorkExperience, then Tracking, then Candidate; InvoiceItem.candidateId set null rather than
+    deleted, since invoice history should survive). Reassigned the 4 real placements still pointing
+    at leftover junk/test agents (Gulf Star, five "P4/P5 Recruitment `<hash>`" placeholders, Test
+    Recruitment Co., and the real-legacy-named Al Hamra Recruitment Agency) onto the matching
+    polished agency by country, then deleted all 9 junk agent + user records, leaving exactly the 6
+    branded foreign agencies. Scrubbed PII on the remaining 19 real candidates (fullName,
+    passportNumber, phone, street-level address, replaced with fictional Sri Lankan equivalents in
+    the same naming/format style) and, found only by actually reading the data rather than
+    assuming the Candidate table was the whole surface: the 4 real migrated invoices' `notes` JSON
+    blob (see the PDF format reversion entry above for what that blob is) carried a real bank
+    account number, a real account holder's name, and real B2B client company names, and
+    `InvoiceItem.description` had the old real candidate names baked in as independent free text
+    that the Candidate-table scrub never touched. Fixed both. Left untouched, deliberately: Topway's
+    own `companyFooter` block (its real public business contact info, not a third party's),
+    `swiftCode` values (public bank routing codes, not account-specific), and
+    `Tracking.notes`/dispute notes (already generic, no embedded identity). Candidate headshot/full-
+    photo files themselves were not replaced (no synthetic photos were available; a materially
+    different, much larger ask than text-field PII).
+  Two destructive actions in this pass (deleting the junk agents, deleting the junk candidates)
+  were blocked by the harness's own auto-mode safety classifier on the first attempt; both were
+  re-run and succeeded only after the user explicitly confirmed intent, not worked around.
+  **Verified live, not just via script exit codes**: screenshotted `/admin/agents` (all 6
+  agencies, real logos, no junk rows, clean contact names), the Blacklist dialog open mid-click
+  (dispute detail + agent attribution), the candidate PDF (countries worked in + populated
+  employment table), the dashboard, and the candidates table (19 fictional names, correct agency
+  assignments, dispute chips intact) — confirmed agent placement counts shifted exactly as
+  expected after the candidate/agent cleanup (e.g. Desert Wave Staffing 5→3, consistent with the
+  2 junk candidates removed from it), not just that the counts looked plausible.
 
 ## Tech stack (exact)
 

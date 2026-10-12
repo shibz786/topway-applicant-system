@@ -17,6 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       include: {
         documents: { where: { type: { in: ["headshot", "fullphoto"] } } },
         placements: { where: { isCurrent: true }, include: { agent: true }, take: 1 },
+        workHistory: { orderBy: { createdAt: "asc" } },
       },
     });
     if (!candidate) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });

@@ -247,6 +247,11 @@ export type CandidateForPdf = {
   skills: string[];
   languages: string[];
   contractDuration: number;
+  // Not a legacy field — the legacy template's own "Employment Record"
+  // table (Position/Country/Period, below) always rendered one blank
+  // placeholder row, since nothing in the old schema ever fed it. Real
+  // content now fills that existing slot instead of inventing a new one.
+  workHistory: { country: string; role: string | null; years: number }[];
 };
 
 const SKILL_ROWS = [
@@ -353,13 +358,18 @@ export function CandidatePdfDocument({
           <View style={styles.maingrid}>
             <View style={styles.leftwide}>
               <InfoRow label="Nationality" value={candidate.nationality} first even={false} />
-              <InfoRow label="Religion" value={candidate.religion ?? ""} even />
-              <InfoRow label="D.O.B" value={fmtDate(candidate.dateOfBirth)} even={false} />
-              <InfoRow label="Age" value={calcAge(candidate.dateOfBirth)} even />
-              <InfoRow label="Height" value="" even={false} />
-              <InfoRow label="Weight" value="" even />
-              <InfoRow label="Marital Status" value="" even={false} />
-              <InfoRow label="Children (No.)" value="" even />
+              <InfoRow
+                label="Countries Worked In"
+                value={[...new Set(candidate.workHistory.map((w) => w.country))].join(", ")}
+                even
+              />
+              <InfoRow label="Religion" value={candidate.religion ?? ""} even={false} />
+              <InfoRow label="D.O.B" value={fmtDate(candidate.dateOfBirth)} even />
+              <InfoRow label="Age" value={calcAge(candidate.dateOfBirth)} even={false} />
+              <InfoRow label="Height" value="" even />
+              <InfoRow label="Weight" value="" even={false} />
+              <InfoRow label="Marital Status" value="" even />
+              <InfoRow label="Children (No.)" value="" even={false} />
 
               <InfoRow label="Passport No." value={candidate.passportNumber} first even={false} />
               <InfoRow label="Date of Issue" value="" even />
@@ -422,11 +432,26 @@ export function CandidatePdfDocument({
               <Text style={[styles.th, { flex: 1 }]}>Country</Text>
               <Text style={[styles.th, { flex: 1 }]}>Period</Text>
             </View>
-            <View style={styles.tableBodyRow}>
-              <Text style={[styles.td, { flex: 1, textAlign: "center", color: COLOR.lineStrong }]}>—</Text>
-              <Text style={[styles.td, { flex: 1 }]} />
-              <Text style={[styles.td, { flex: 1 }]} />
-            </View>
+            {candidate.workHistory.length > 0 ? (
+              candidate.workHistory.map((w, i) => (
+                <View
+                  key={i}
+                  style={[styles.tableBodyRow, i % 2 === 1 ? styles.tableBodyRowEven : undefined]}
+                >
+                  <Text style={[styles.td, { flex: 1 }]}>{w.role || ""}</Text>
+                  <Text style={[styles.td, { flex: 1 }]}>{w.country}</Text>
+                  <Text style={[styles.td, { flex: 1 }]}>{`${w.years} Year${w.years === 1 ? "" : "s"}`}</Text>
+                </View>
+              ))
+            ) : (
+              // Legacy's own empty state — unchanged — for a candidate with
+              // no prior placements entered yet.
+              <View style={styles.tableBodyRow}>
+                <Text style={[styles.td, { flex: 1, textAlign: "center", color: COLOR.lineStrong }]}>—</Text>
+                <Text style={[styles.td, { flex: 1 }]} />
+                <Text style={[styles.td, { flex: 1 }]} />
+              </View>
+            )}
           </View>
         </View>
 
