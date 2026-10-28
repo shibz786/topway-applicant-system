@@ -32,6 +32,15 @@ export function detectMimeFromBytes(buffer: Buffer): string | null {
   if (buffer.subarray(0, 6).toString("ascii") === "GIF87a" || buffer.subarray(0, 6).toString("ascii") === "GIF89a") {
     return "image/gif";
   }
+  // SVG is text, not a binary format with fixed magic bytes - B2 (foreign
+  // agency logo upload) needs to accept it per spec. Check the first 300
+  // bytes (past any BOM/XML prolog/doctype/comments) for a real <svg root
+  // element rather than trusting the declared Content-Type/extension
+  // alone, same "never trust extension" rule as every other type here.
+  const head = buffer.subarray(0, 300).toString("utf8").replace(/^﻿/, "").trimStart();
+  if (/^(<\?xml[^>]*\?>\s*)?(<!doctype[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(head)) {
+    return "image/svg+xml";
+  }
   return null;
 }
 
@@ -43,6 +52,7 @@ export const EXT_FOR_MIME: Record<string, string> = {
   "image/webp": "webp",
   "application/pdf": "pdf",
   "image/gif": "gif",
+  "image/svg+xml": "svg",
 };
 
 export { DOCUMENT_TYPES, type DocumentType } from "./document-types";

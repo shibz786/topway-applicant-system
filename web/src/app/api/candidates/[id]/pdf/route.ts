@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import { db } from "@/lib/db";
-import { requireSession } from "@/lib/auth/session";
+import { requireSession, runAsActor } from "@/lib/auth/session";
 import { assertCanViewCandidate } from "@/lib/auth/candidate-access";
 import { storage } from "@/lib/storage/adapter";
 import { detectMimeFromBytes } from "@/lib/storage/validate-upload";
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const user = await requireSession();
     const { id } = await params;
 
-    const candidate = await db.candidate.findUnique({
+    let candidate = await db.candidate.findUnique({
       where: { id },
       include: {
         documents: { where: { type: { in: ["headshot", "fullphoto", "passport"] } } },
@@ -52,28 +52,72 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     await assertCanViewCandidate(user, id);
 
+    // B2: resolve this CV's logo-slot choice on first generation and
+    // freeze it (spec: "the choice is saved per CV, so re-downloading
+    // gives the same result" / "existing CVs keep their saved choice"
+    // even after the agent's default later changes). Already-resolved
+    // candidates (cvLogoMode set) skip straight to using what's saved.
+    if (candidate.cvLogoMode === null) {
+      const agent = candidate.placements[0]?.agent;
+      let mode: string = "EMPTY";
+      let r2Key: string | null = null;
+      if (agent) {
+        mode = agent.defaultLogoMode;
+        if (mode === "LOGO") {
+          if (agent.defaultLogoId) {
+            const logo = await db.agentLogo.findUnique({ where: { id: agent.defaultLogoId } });
+            r2Key = logo?.r2Key ?? agent.logoR2Key;
+          } else {
+            r2Key = agent.logoR2Key;
+          }
+          if (!r2Key) mode = "EMPTY"; // default says LOGO but nothing's actually on file
+        }
+      }
+      candidate = await runAsActor(user, () =>
+        db.candidate.update({
+          where: { id },
+          data: { cvLogoMode: mode, cvLogoR2Key: r2Key },
+          include: {
+            documents: { where: { type: { in: ["headshot", "fullphoto", "passport"] } } },
+            placements: { where: { isCurrent: true }, include: { agent: true }, take: 1 },
+            workHistory: { orderBy: { createdAt: "asc" } },
+          },
+        }),
+      );
+    }
+
     async function toDataUri(r2Key: string, mimeType: string): Promise<string> {
       const bytes = await storage.getObject(r2Key);
       return `data:${mimeType};base64,${bytes.toString("base64")}`;
     }
 
-    // Agent.logoR2Key has no companion mimeType column (unlike Document,
-    // which records the real one at upload time) — sniff it from the bytes
-    // instead of guessing. A previous version hardcoded "image/png" here,
-    // which silently broke every non-PNG logo (react-pdf/pdfkit fails to
-    // decode JPEG bytes labeled image/png and just renders nothing, no
-    // error) — only surfaced once real agent logos existed to test against.
+    // Agent/AgentLogo-sourced keys have no companion mimeType column
+    // (unlike Document, which records the real one at upload time) — sniff
+    // it from the bytes instead of guessing. A previous version hardcoded
+    // "image/png" here, which silently broke every non-PNG logo (react-
+    // pdf/pdfkit fails to decode JPEG bytes labeled image/png and just
+    // renders nothing, no error) — only surfaced once real agent logos
+    // existed to test against.
+    //
+    // react-pdf's <Image> can't embed SVG at all (it rasterizes PNG/JPEG
+    // data, not vector markup) — a logo saved as SVG renders as nothing
+    // here, which CandidatePdfDocument already treats the same as "no
+    // image resolved" (empty slot, not a crash). Logo library uploads
+    // still accept SVG per spec (B2) since every OTHER place they're used
+    // (the Settings page's own preview, browsers generally) renders SVG
+    // natively — this is a real, deliberate limitation specific to the
+    // server-side PDF embed, not a bug to silently "fix" with a guess.
     async function agentLogoDataUriFor(r2Key: string): Promise<string | null> {
       const bytes = await storage.getObject(r2Key);
       const mime = detectMimeFromBytes(bytes);
-      if (!mime) return null;
+      if (!mime || mime === "image/svg+xml") return null;
       return `data:${mime};base64,${bytes.toString("base64")}`;
     }
 
     const headshot = candidate.documents.find((d) => d.type === "headshot");
     const fullphoto = candidate.documents.find((d) => d.type === "fullphoto");
     const passport = candidate.documents.find((d) => d.type === "passport");
-    const agentLogoKey = candidate.placements[0]?.agent.logoR2Key;
+    const agentLogoKey = candidate.cvLogoMode === "LOGO" ? candidate.cvLogoR2Key : null;
 
     const [headshotDataUri, fullPhotoDataUri, agentLogoDataUri] = await Promise.all([
       headshot ? toDataUri(headshot.r2Key, headshot.mimeType) : Promise.resolve(null),
@@ -81,7 +125,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       agentLogoKey ? agentLogoDataUriFor(agentLogoKey).catch(() => null) : Promise.resolve(null),
     ]);
 
-    let pdfBuffer = await renderCandidatePdf({ candidate, headshotDataUri, fullPhotoDataUri, agentLogoDataUri });
+    let pdfBuffer = await renderCandidatePdf({
+      candidate,
+      headshotDataUri,
+      fullPhotoDataUri,
+      agentLogoDataUri,
+      logoMode: candidate.cvLogoMode as "LOGO" | "COMPANY_NAME" | "EMPTY" | null,
+    });
 
     // A4: append the passport copy as extra pages, same combined PDF. A
     // candidate with no passport copy on file still downloads fine — this

@@ -23,6 +23,7 @@ import { DepartureSection } from "./departure-section";
 import { AuditLogView } from "./audit-log-view";
 import { AgentAssignment } from "./agent-assignment";
 import { ChangeEmployerDialog } from "./change-employer-dialog";
+import { CvLogoPicker } from "./cv-logo-picker";
 
 // A centered popup, not a side sheet (the user's explicit call after
 // reviewing the redesign directions) — a candidate record is something you
@@ -139,6 +140,9 @@ export function CandidateDetailDialog({
                   <Button size="sm" variant="outline" asChild>
                     <Link href={`/admin/candidates/${candidate.id}/edit`}>Edit Profile</Link>
                   </Button>
+                )}
+                {canEditProfile && (
+                  <CvLogoPicker candidateId={candidate.id} currentMode={candidate.cvLogoMode} onChanged={refresh} />
                 )}
               </div>
 

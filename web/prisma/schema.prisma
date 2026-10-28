@@ -128,6 +128,34 @@ model Agent {
   // free-text field, not tied to any specific registry format.
   licenseNo      String?
   contactNo      String?
+  // B2: this agent's own default CV branding choice (left-hand "foreign
+  // agency logo" slot). "LOGO" uses logoR2Key above by default unless
+  // defaultLogoId below points at a different saved logo from the shared
+  // library. Existing agents default to showing logoR2Key if they already
+  // have one (preserves current behavior), EMPTY otherwise - never printed
+  // the placeholder text either way (see the A1/B2 bug fix).
+  defaultLogoMode String      @default("EMPTY") // "LOGO" | "COMPANY_NAME" | "EMPTY"
+  defaultLogoId   String?
+  logos           AgentLogo[]
+}
+
+// B2: a shared library of foreign-agency logos, not scoped one-per-Agent -
+// staff/admin building a candidate's CV may want to brand it for whichever
+// foreign counterpart it's actually headed to, which isn't always the one
+// fixed Agent.logoR2Key. agentId is nullable: a logo can belong to one
+// Agent's own library (they manage/delete their own) or be a general-
+// purpose upload from staff with no single owning Agent.
+model AgentLogo {
+  id              String   @id @default(cuid())
+  agentId         String?
+  agent           Agent?   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  uploadedByUserId String
+  r2Key           String
+  mimeType        String
+  label           String?
+  createdAt       DateTime @default(now())
+
+  @@index([agentId])
 }
 
 model Candidate {
@@ -171,6 +199,15 @@ model Candidate {
   // Invoice.number - a single atomic nextval() is safe under transaction-
   // mode pooling, no interactive transaction needed. Format "TW-00001".
   refNo                String?   @unique
+  // B2: this CV's own branding choice for the left-hand logo slot, frozen
+  // the first time a CV is actually generated for this candidate (see
+  // candidate-pdf resolution in the pdf route) - null means "not generated
+  // yet, will resolve from the assigned agent's current default." Once
+  // set, sticky even if the agent's default changes later (spec: "new CVs
+  // use it, existing CVs keep their saved choice"), unless explicitly
+  // overridden through the per-CV picker.
+  cvLogoMode           String?   // "LOGO" | "COMPANY_NAME" | "EMPTY"
+  cvLogoR2Key          String?   // set when cvLogoMode = "LOGO"
   documents        Document[]
   placements       Placement[]
   tracking         Tracking?

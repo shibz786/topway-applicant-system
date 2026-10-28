@@ -23,6 +23,7 @@ function navItemsFor(user: SessionUser): NavItem[] {
       items.push({ href: "/agent/databank", label: "Databank" });
     }
     items.push({ href: "/blacklist", label: "Blacklist" });
+    items.push({ href: "/settings", label: "Settings" });
     return items;
   }
 
@@ -43,6 +44,7 @@ function navItemsFor(user: SessionUser): NavItem[] {
   if (user.role === "ADMIN" || user.permissions.invoices) {
     items.push({ href: "/invoices", label: "Invoices" });
   }
+  items.push({ href: "/settings", label: "Settings" });
   return items;
 }
 

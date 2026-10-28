@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   logoSlot: { flex: 1, minHeight: 43.5, justifyContent: "center" },
   logoSlotRight: { flex: 1, minHeight: 43.5, justifyContent: "center", alignItems: "flex-end" },
   logoImg: { maxHeight: 43.5, maxWidth: 150, objectFit: "contain" },
-  logoEmpty: { fontSize: 8.5, color: COLOR.muted, fontStyle: "italic" },
+  logoCompanyName: { fontSize: 11, fontWeight: 900, letterSpacing: 0.6, textTransform: "uppercase", color: COLOR.accent },
   headerCenter: {
     flex: 1.5,
     textAlign: "center",
@@ -283,14 +283,23 @@ export function CandidatePdfDocument({
   headshotDataUri,
   fullPhotoDataUri,
   agentLogoDataUri,
+  logoMode,
 }: {
   candidate: CandidateForPdf;
   headshotDataUri: string | null;
   fullPhotoDataUri: string | null;
   agentLogoDataUri: string | null;
+  // B2: resolved per-CV choice for the left-hand slot. "LOGO" needs
+  // agentLogoDataUri to actually have a value (falls back to empty if it
+  // doesn't - e.g. the saved logo was an SVG, which react-pdf can't embed,
+  // see the pdf route's comment on that). Defaults to "EMPTY" for any CV
+  // generated before this field existed, matching the earlier bug fix that
+  // stopped printing the literal placeholder text either way.
+  logoMode?: "LOGO" | "COMPANY_NAME" | "EMPTY" | null;
 }) {
   const hasEn = candidate.languages.includes("English");
   const hasAr = candidate.languages.includes("Arabic");
+  const resolvedLogoMode = logoMode ?? "EMPTY";
 
   return (
     <Document>
@@ -298,17 +307,14 @@ export function CandidatePdfDocument({
         {/* HEADER */}
         <View style={styles.topbar}>
           <View style={styles.logoSlot}>
-            {/* B2 bug fix: this slot used to print the literal placeholder
-                text "Foreign agency logo" on every real CV with no logo set
-                — left empty instead, so the header still balances (fixed
-                topbar height) without ever showing debug-looking text. Full
-                per-CV choice (logo / company name / empty) is built as its
-                own feature in the Settings work; this is the safe default
-                for every CV that predates that choice existing. */}
-            {agentLogoDataUri && (
+            {resolvedLogoMode === "LOGO" && agentLogoDataUri && (
               // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image, no alt prop
               <Image src={agentLogoDataUri} style={styles.logoImg} />
             )}
+            {resolvedLogoMode === "COMPANY_NAME" && <Text style={styles.logoCompanyName}>Topway Private Limited</Text>}
+            {/* "EMPTY", or "LOGO" with no actual image resolved: slot stays
+                blank, header still balances via the fixed topbar height -
+                never the literal placeholder text "Foreign agency logo". */}
           </View>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>Candidate Profile</Text>
@@ -514,6 +520,7 @@ export async function renderCandidatePdf(props: {
   headshotDataUri: string | null;
   fullPhotoDataUri: string | null;
   agentLogoDataUri: string | null;
+  logoMode?: "LOGO" | "COMPANY_NAME" | "EMPTY" | null;
 }): Promise<Buffer> {
   registerPdfFonts();
   return renderToBuffer(<CandidatePdfDocument {...props} />);
