@@ -23,11 +23,17 @@ function navItemsFor(user: SessionUser): NavItem[] {
       items.push({ href: "/agent/databank", label: "Databank" });
     }
     items.push({ href: "/blacklist", label: "Blacklist" });
+    // D1: the cross-category Applications view, distinct from "My
+    // Applications" above (the Agent Portal's own richer card UI) - this
+    // one is the same table every other role sees, just scoped to this
+    // agent's own candidates server-side.
+    items.push({ href: "/applications", label: "Applications" });
     items.push({ href: "/settings", label: "Settings" });
     return items;
   }
 
   items.push({ href: "/admin/candidates", label: "Candidates" });
+  items.push({ href: "/applications", label: "Applications" });
   if (user.role === "ADMIN" || user.permissions.tracking) {
     items.push({ href: "/admin/tracking", label: "Tracking" });
     // Blacklist is disputed-candidate history — same permission that
