@@ -25,6 +25,32 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Two SEPARATE Next.js body-size limits both had to be raised, found live
+  // via UAT-20 (oversized-file upload test), not assumed - fixing only one
+  // still breaks uploads:
+  //  1. Server Actions default to a 1MB request body limit, which silently
+  //     rejected every upload between 1-10MB with a raw Next.js error
+  //     ("Body exceeded 1 MB limit...") well before any of this app's own
+  //     MAX_UPLOAD_BYTES (10MB, CLAUDE.md rule #7) or magic-byte checks
+  //     ever ran.
+  //  2. This app's middleware.ts (CSP nonce injection) runs on every
+  //     request including these POSTs, and Next's middleware layer has
+  //     its OWN separate ~10MB body cap. Exactly where this matters most:
+  //     since MAX_UPLOAD_BYTES is also 10MB, every file this app is
+  //     actually supposed to reject as "too large" sits right in the
+  //     range the middleware cap truncates mid-multipart-boundary first -
+  //     corrupting the request into "Unexpected end of form", an
+  //     unhandled 500, instead of ever reaching the clean "File too large
+  //     (max 10MB)" ActionError this app's own code throws. 12mb/13mb
+  //     give real headroom above the true 10MB content cap those actions
+  //     enforce themselves, so a too-large file now actually reaches that
+  //     code instead of being truncated before it gets there.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "12mb",
+    },
+    middlewareClientMaxBodySize: "13mb",
+  },
 };
 
 export default nextConfig;
