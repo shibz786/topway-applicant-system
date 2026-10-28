@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { uploadDocument, deleteDocument, listCandidateDocuments } from "@/lib/actions/documents";
-import { DOCUMENT_TYPES, type DocumentType } from "@/lib/storage/document-types";
+import type { DocumentType } from "@/lib/storage/document-types";
 import { Button } from "@/components/ui/button";
 
 const TYPE_LABELS: Record<DocumentType, string> = {
@@ -12,9 +12,26 @@ const TYPE_LABELS: Record<DocumentType, string> = {
   fullphoto: "Full Photo",
   passport: "Passport Scan",
   alteration: "Alteration Docs",
+  own_cv: "Candidate's CV",
+  certificate: "Certificate",
 };
 
-export function DocumentUpload({ candidateId, canEdit }: { candidateId: string; canEdit: boolean }) {
+// C3/C4 use this same slot UI for "own_cv" (one CV, same single-slot shape
+// as headshot/passport/etc.) but NOT for "certificate" - those are
+// genuinely multiple files per candidate, a different shape, handled by
+// CertificateUpload instead. `types` defaults to the original Domestic/
+// General 4 so every existing call site is unaffected.
+const DEFAULT_TYPES: DocumentType[] = ["headshot", "fullphoto", "passport", "alteration"];
+
+export function DocumentUpload({
+  candidateId,
+  canEdit,
+  types = DEFAULT_TYPES,
+}: {
+  candidateId: string;
+  canEdit: boolean;
+  types?: DocumentType[];
+}) {
   const queryClient = useQueryClient();
   const queryKey = ["candidate-documents", candidateId];
 
@@ -29,7 +46,7 @@ export function DocumentUpload({ candidateId, canEdit }: { candidateId: string; 
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {DOCUMENT_TYPES.map((type) => {
+      {types.map((type) => {
         const doc = documents?.find((d) => d.type === type);
         return (
           <DocumentSlot

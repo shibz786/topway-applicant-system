@@ -52,6 +52,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     await assertCanViewCandidate(user, id);
 
+    // C3/C4: "No generated CV" - those modules upload their own CV PDF
+    // instead (served through /api/files/[fileId] like any other
+    // Document, not this route). Generating the Domestic/General template
+    // for a Skilled/Professional candidate would print a nonsensical CV
+    // (housemaid skill checkboxes etc. on an engineer's record).
+    if (candidate.workforceModule === "SKILLED" || candidate.workforceModule === "PROFESSIONAL") {
+      return NextResponse.json(
+        { ok: false, error: "This workforce module doesn't generate a CV - use the candidate's uploaded CV instead." },
+        { status: 400 },
+      );
+    }
+
     // B2: resolve this CV's logo-slot choice on first generation and
     // freeze it (spec: "the choice is saved per CV, so re-downloading
     // gives the same result" / "existing CVs keep their saved choice"

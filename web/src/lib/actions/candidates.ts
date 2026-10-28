@@ -9,13 +9,16 @@ import {
   candidateSchema,
   personalDetailsSchema,
   experienceSkillsSchema,
+  basicInfoSchema,
   type CandidateInput,
   type PersonalDetailsInput,
   type ExperienceSkillsInput,
+  type BasicInfoInput,
+  type WorkforceModule as WorkforceModuleInput,
 } from "@/lib/validation/candidate";
 import { PIPELINE_STEPS } from "@/lib/business/tracking";
 import { runAction, ActionError, type ActionResult } from "./result";
-import type { ApplicationStatus, DestCountry } from "@prisma/client";
+import type { ApplicationStatus, DestCountry, WorkforceModule } from "@prisma/client";
 
 // personalDetailsSchema's A1 fields come through as a validated number/
 // string | undefined ("not entered") — this converts that into what
@@ -52,6 +55,13 @@ export type CandidateListFilters = {
   status?: ApplicationStatus;
   agentId?: string;
   destinationCountry?: DestCountry;
+  // D: cross-category Applications page filters. workforceModule also
+  // backs each module's own list page (C1's "own candidate list... and
+  // filters" etc.) - same underlying query, just pre-set to one module.
+  workforceModule?: WorkforceModule;
+  nationality?: string;
+  createdFrom?: Date;
+  createdTo?: Date;
 };
 
 export type CandidateListRow = Awaited<ReturnType<typeof listCandidatesInternal>>[number];
@@ -61,6 +71,14 @@ async function listCandidatesInternal(user: Awaited<ReturnType<typeof requireSes
   if (filters.status) where.tracking = { applicationStatus: filters.status };
   if (filters.destinationCountry) {
     where.tracking = { ...(where.tracking as object), destinationCountry: filters.destinationCountry };
+  }
+  if (filters.workforceModule) where.workforceModule = filters.workforceModule;
+  if (filters.nationality) where.nationality = { contains: filters.nationality, mode: "insensitive" };
+  if (filters.createdFrom || filters.createdTo) {
+    where.createdAt = {
+      ...(filters.createdFrom ? { gte: filters.createdFrom } : {}),
+      ...(filters.createdTo ? { lte: filters.createdTo } : {}),
+    };
   }
 
   // Agents only ever see their own candidates (current placement or
@@ -98,8 +116,15 @@ async function listCandidatesInternal(user: Awaited<ReturnType<typeof requireSes
       return {
         id: r.id,
         fullName: r.fullName,
+        nationality: r.nationality,
         passportNumber: r.passportNumber,
         category: r.category,
+        workforceModule: r.workforceModule,
+        // SKILLED/PROFESSIONAL store their trade/role in skills[0] (no
+        // dedicated column - see createBasicCandidate's comment); unused
+        // for DOMESTIC/GENERAL where skills is a real multi-select.
+        trade: r.skills[0] ?? null,
+        createdAt: r.createdAt,
         applicationStatus: r.tracking?.applicationStatus ?? "ACTIVE",
         currentPipelineStep: currentStep?.label ?? null,
         agentName: r.placements[0]?.agent.companyName ?? null,
@@ -184,7 +209,10 @@ const STEP2_DEFAULTS = {
   contractDuration: 24,
 };
 
-export async function createCandidateDraft(input: PersonalDetailsInput): Promise<ActionResult<{ id: string }>> {
+export async function createCandidateDraft(
+  input: PersonalDetailsInput,
+  workforceModule: WorkforceModuleInput = "DOMESTIC",
+): Promise<ActionResult<{ id: string }>> {
   return runAction(async () => {
     const user = await requireSession();
     requirePermission(user, "applications");
@@ -207,6 +235,7 @@ export async function createCandidateDraft(input: PersonalDetailsInput): Promise
           address: data.address || null,
           religion: data.religion || null,
           refNo,
+          workforceModule,
           ...a1FieldsToDbData(data),
           ...STEP2_DEFAULTS,
         },
@@ -339,3 +368,84 @@ export async function updateCandidateFull(id: string, input: CandidateInput): Pr
 // for. If this becomes needed, model it as an application-status action
 // (e.g. an "Archived" state) instead of a real delete, consistent with how
 // Cancel/Hold/Resume already work.
+
+// ─────────────────────────────────────────────────────────────────
+// C3/C4 — Skilled & Technical / Professional Workforce ("basic candidate
+// info" only, no generated CV - own CV + certificates come through
+// documents.ts's uploadDocument with type "own_cv"/"certificate")
+// ─────────────────────────────────────────────────────────────────
+
+export async function createBasicCandidate(
+  input: BasicInfoInput,
+  workforceModule: Extract<WorkforceModuleInput, "SKILLED" | "PROFESSIONAL">,
+): Promise<ActionResult<{ id: string }>> {
+  return runAction(async () => {
+    const user = await requireSession();
+    requirePermission(user, "applications");
+
+    const parsed = basicInfoSchema.safeParse(input);
+    if (!parsed.success) throw new ActionError(parsed.error.issues[0]?.message ?? "Invalid input");
+    const data = parsed.data;
+
+    const refNo = await nextRefNo();
+    const candidate = await runAsActor(user, () =>
+      db.candidate.create({
+        data: {
+          fullName: data.fullName,
+          nationality: data.nationality,
+          dateOfBirth: new Date(data.dateOfBirth),
+          passportNumber: data.passportNumber,
+          passportExpiry: new Date(data.passportExpiry),
+          phone: data.phone || null,
+          address: data.address || null,
+          refNo,
+          workforceModule,
+          category: "FIRST_TIMER",
+          // "trade" (e.g. "Electrician") has no dedicated column - skills
+          // is the closest existing free-text-array home for it, matching
+          // how the rest of this module reuses Candidate's real columns
+          // rather than growing a second parallel schema (see the
+          // basicInfoSchema comment in validation/candidate.ts).
+          skills: data.trade ? [data.trade] : [],
+          languages: [],
+          yearsExperience: data.yearsExperience ?? 0,
+          contractDuration: 24,
+        },
+      }),
+    );
+    await runAsActor(user, () => db.tracking.create({ data: { candidateId: candidate.id } }));
+    return { id: candidate.id };
+  });
+}
+
+export async function updateBasicCandidate(id: string, input: BasicInfoInput): Promise<ActionResult<null>> {
+  return runAction(async () => {
+    const user = await requireSession();
+    requirePermission(user, "applications");
+
+    const parsed = basicInfoSchema.safeParse(input);
+    if (!parsed.success) throw new ActionError(parsed.error.issues[0]?.message ?? "Invalid input");
+    const data = parsed.data;
+
+    const existing = await db.candidate.findUnique({ where: { id } });
+    if (!existing) throw new ActionError("Candidate not found");
+
+    await runAsActor(user, () =>
+      db.candidate.update({
+        where: { id },
+        data: {
+          fullName: data.fullName,
+          nationality: data.nationality,
+          dateOfBirth: new Date(data.dateOfBirth),
+          passportNumber: data.passportNumber,
+          passportExpiry: new Date(data.passportExpiry),
+          phone: data.phone || null,
+          address: data.address || null,
+          skills: data.trade ? [data.trade] : [],
+          yearsExperience: data.yearsExperience ?? 0,
+        },
+      }),
+    );
+    return null;
+  });
+}

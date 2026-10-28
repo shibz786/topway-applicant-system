@@ -102,3 +102,38 @@ export type CandidateInput = z.infer<typeof candidateSchema>;
 
 export const SKILL_OPTIONS = ["Cleaning", "Washing", "Babysitting", "Cooking", "Driving"];
 export const LANGUAGE_OPTIONS = ["English", "Arabic", "Hindi", "Tamil", "Sinhala", "Tagalog"];
+
+// C2: General Workforce reuses the Domestic CV template and the exact same
+// `skills: String[]` column - spec: "swapping job-relevant skills ... for
+// the household ones." Same CHECKBOX_ROWS mechanism in candidate-pdf.tsx,
+// just a different label/key set selected by workforceModule at render
+// time (see GENERAL_SKILL_ROWS there).
+export const GENERAL_SKILL_OPTIONS = ["Construction", "Factory Work", "Cleaning", "Loading", "Warehouse"];
+
+export const WORKFORCE_MODULES = ["DOMESTIC", "GENERAL", "SKILLED", "PROFESSIONAL"] as const;
+export type WorkforceModule = (typeof WORKFORCE_MODULES)[number];
+export const WORKFORCE_MODULE_LABELS: Record<WorkforceModule, string> = {
+  DOMESTIC: "Domestic Workforce",
+  GENERAL: "General Workforce",
+  SKILLED: "Skilled & Technical Workforce",
+  PROFESSIONAL: "Professional Workforce",
+};
+
+// C3/C4: Skilled & Technical / Professional Workforce have no generated
+// CV - just "basic candidate info." A deliberately small subset of
+// Candidate's real columns (identity + contact only), not a second parallel
+// schema - the rest of the Candidate row's columns (skills, languages,
+// religion, height, etc.) simply stay unused/default for these two
+// modules, same reasoning as the schema.prisma comment on workforceModule.
+export const basicInfoSchema = z.object({
+  fullName: z.string().trim().min(1, "Full name is required").max(200),
+  nationality: z.string().trim().min(1, "Nationality is required").max(100),
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  passportNumber: z.string().trim().min(1, "Passport number is required").max(50),
+  passportExpiry: z.string().min(1, "Passport expiry is required"),
+  phone: z.string().trim().max(50).optional(),
+  address: z.string().trim().max(500).optional(),
+  trade: z.string().trim().max(150).optional(), // e.g. "Electrician", "Civil Engineer" - free text, not an enum
+  yearsExperience: nanToUndefined(z.number().int().min(0).max(60).optional()),
+});
+export type BasicInfoInput = z.infer<typeof basicInfoSchema>;

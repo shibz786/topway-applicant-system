@@ -268,14 +268,27 @@ export type CandidateForPdf = {
   // itself allows null) — fall back to "-" rather than ever print a name
   // there again.
   refNo: string | null;
+  // C2: General Workforce reuses this exact template with a different
+  // skill set (spec: "swapping job-relevant skills ... for the household
+  // ones") - this is the only thing that changes which SKILL_ROWS renders
+  // below. "DOMESTIC" for every CV generated before this field existed.
+  workforceModule?: "DOMESTIC" | "GENERAL" | "SKILLED" | "PROFESSIONAL";
 };
 
-const SKILL_ROWS = [
+const DOMESTIC_SKILL_ROWS = [
   { key: "Cleaning", label: "Cleaning" },
   { key: "Washing", label: "Washing" },
   { key: "Babysitting", label: "Baby Sitting" },
   { key: "Cooking", label: "Arabic Cooking" },
   { key: "Driving", label: "Driving" },
+];
+
+const GENERAL_SKILL_ROWS = [
+  { key: "Construction", label: "Construction" },
+  { key: "Factory Work", label: "Factory Work" },
+  { key: "Cleaning", label: "Cleaning" },
+  { key: "Loading", label: "Loading" },
+  { key: "Warehouse", label: "Warehouse" },
 ];
 
 export function CandidatePdfDocument({
@@ -300,6 +313,7 @@ export function CandidatePdfDocument({
   const hasEn = candidate.languages.includes("English");
   const hasAr = candidate.languages.includes("Arabic");
   const resolvedLogoMode = logoMode ?? "EMPTY";
+  const skillRows = candidate.workforceModule === "GENERAL" ? GENERAL_SKILL_ROWS : DOMESTIC_SKILL_ROWS;
 
   return (
     <Document>
@@ -332,7 +346,7 @@ export function CandidatePdfDocument({
           <View style={styles.topgrid}>
             <View style={[styles.box, { flex: 1.1 }]}>
               <Text style={styles.boxTitle}>Skills</Text>
-              {SKILL_ROWS.map((s, i) => (
+              {skillRows.map((s, i) => (
                 <View
                   key={s.key}
                   style={[
@@ -364,7 +378,14 @@ export function CandidatePdfDocument({
                 <Rect x={0} y={0} width={100} height={100} fill="url(#roleGrad)" />
               </Svg>
               <View style={styles.roleBoxInner}>
-                <Text style={styles.roleTitle}>Housemaid</Text>
+                {/* "Housemaid" is exact legacy content for DOMESTIC - "cant
+                    change at all" per the PDF-reversion rule. GENERAL is
+                    new content this rebuild is adding, not a legacy field,
+                    so it gets its own real label rather than inheriting a
+                    domestic-specific one. */}
+                <Text style={styles.roleTitle}>
+                  {candidate.workforceModule === "GENERAL" ? "General Worker" : "Housemaid"}
+                </Text>
                 <Text style={styles.contractBadge}>Contract: {contractLabel(candidate.contractDuration)}</Text>
               </View>
             </View>

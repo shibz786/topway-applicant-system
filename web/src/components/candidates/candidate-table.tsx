@@ -26,6 +26,7 @@ function disputeChipLabel(types: DisputeType[]): string {
 import type { SessionUser } from "@/lib/auth/session";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,17 +42,29 @@ const CONTRACT_STAGE_LABELS: Record<ContractStage, string> = {
   CONTRACT_CLOSED: "Contract Closed",
 };
 
-export function CandidateTable({ user }: { user: SessionUser }) {
+export function CandidateTable({
+  user,
+  workforceModule = "DOMESTIC",
+}: {
+  user: SessionUser;
+  // C1/C2: each module gets "its own candidate list, search, filters" -
+  // same table component, scoped to one module at a time by the page
+  // above (the Candidates page's module tabs), not a prop the user picks
+  // from inside the table itself.
+  workforceModule?: "DOMESTIC" | "GENERAL";
+}) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [agentFilter, setAgentFilter] = useState<string>("all");
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [stageFilter, setStageFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["candidates", statusFilter, agentFilter, countryFilter],
+    queryKey: ["candidates", workforceModule, statusFilter, agentFilter, countryFilter],
     queryFn: async () => {
       const res = await listCandidates({
+        workforceModule,
         status: statusFilter === "all" ? undefined : (statusFilter as ApplicationStatus),
         agentId: agentFilter === "all" ? undefined : agentFilter,
         destinationCountry: countryFilter === "all" ? undefined : (countryFilter as DestCountry),
@@ -73,13 +86,22 @@ export function CandidateTable({ user }: { user: SessionUser }) {
 
   const rows = useMemo(() => {
     if (!data) return [];
-    if (stageFilter === "all") return data;
-    return data.filter((r) => deriveContractStage(r) === stageFilter);
-  }, [data, stageFilter]);
+    let out = data;
+    if (stageFilter !== "all") out = out.filter((r) => deriveContractStage(r) === stageFilter);
+    const q = search.trim().toLowerCase();
+    if (q) out = out.filter((r) => r.fullName.toLowerCase().includes(q) || r.passportNumber.toLowerCase().includes(q));
+    return out;
+  }, [data, stageFilter, search]);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name or passport…"
+          className="h-9 w-56"
+        />
         <FilterSelect
           value={statusFilter}
           onChange={setStatusFilter}

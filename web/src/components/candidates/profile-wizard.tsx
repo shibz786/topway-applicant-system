@@ -20,7 +20,9 @@ import {
   MARITAL_STATUS_OPTIONS,
   type PersonalDetailsInput,
   type ExperienceSkillsInput,
+  type WorkforceModule,
   SKILL_OPTIONS,
+  GENERAL_SKILL_OPTIONS,
   LANGUAGE_OPTIONS,
 } from "@/lib/validation/candidate";
 import { WORKER_CATEGORY_LABELS } from "@/lib/business/tracking";
@@ -37,7 +39,17 @@ import type { WorkerCategory } from "@prisma/client";
 
 const STEPS = ["Personal Details", "Experience & Skills", "Documents", "Review"] as const;
 
-export function ProfileWizard({ candidateId: initialCandidateId }: { candidateId?: string }) {
+export function ProfileWizard({
+  candidateId: initialCandidateId,
+  workforceModule = "DOMESTIC",
+}: {
+  candidateId?: string;
+  // C1/C2 share this exact wizard (spec: "Reuse the Domestic CV template,
+  // swapping job-relevant skills"). C3/C4 use BasicInfoForm instead, not
+  // this component at all - no generated CV, so the 4-step flow doesn't
+  // apply to them.
+  workforceModule?: WorkforceModule;
+}) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [candidateId, setCandidateId] = useState<string | undefined>(initialCandidateId);
@@ -52,6 +64,12 @@ export function ProfileWizard({ candidateId: initialCandidateId }: { candidateId
     enabled: !!initialCandidateId,
   });
 
+  // Editing an existing candidate always uses ITS OWN saved module, never
+  // whatever the route happened to be reached with - the module isn't
+  // something a later edit should be able to silently change.
+  const effectiveModule = existing?.workforceModule ?? workforceModule;
+  const skillOptions = effectiveModule === "GENERAL" ? GENERAL_SKILL_OPTIONS : SKILL_OPTIONS;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <WizardStepper current={step} />
@@ -60,6 +78,7 @@ export function ProfileWizard({ candidateId: initialCandidateId }: { candidateId
         <PersonalDetailsStep
           candidateId={candidateId}
           existing={existing}
+          workforceModule={effectiveModule}
           onDone={(id) => {
             setCandidateId(id);
             setStep(1);
@@ -70,6 +89,7 @@ export function ProfileWizard({ candidateId: initialCandidateId }: { candidateId
         <ExperienceSkillsStep
           candidateId={candidateId}
           existing={existing}
+          skillOptions={skillOptions}
           onBack={() => setStep(0)}
           onDone={() => setStep(2)}
         />
@@ -107,10 +127,12 @@ function WizardStepper({ current }: { current: number }) {
 function PersonalDetailsStep({
   candidateId,
   existing,
+  workforceModule,
   onDone,
 }: {
   candidateId?: string;
   existing?: CandidateDetail;
+  workforceModule: WorkforceModule;
   onDone: (id: string) => void;
 }) {
   const {
@@ -198,7 +220,7 @@ function PersonalDetailsStep({
   async function onSubmit(values: PersonalDetailsInput) {
     const res = candidateId
       ? await updateCandidatePersonal(candidateId, values)
-      : await createCandidateDraft(values);
+      : await createCandidateDraft(values, workforceModule);
     if (!res.ok) {
       toast.error(res.error);
       return;
@@ -325,11 +347,13 @@ function PersonalDetailsStep({
 function ExperienceSkillsStep({
   candidateId,
   existing,
+  skillOptions,
   onBack,
   onDone,
 }: {
   candidateId: string;
   existing?: CandidateDetail;
+  skillOptions: string[];
   onBack: () => void;
   onDone: () => void;
 }) {
@@ -446,7 +470,7 @@ function ExperienceSkillsStep({
             </div>
           </div>
 
-          <CheckboxGroup control={control} name="skills" label="Skills" options={SKILL_OPTIONS} />
+          <CheckboxGroup control={control} name="skills" label="Skills" options={skillOptions} />
           <CheckboxGroup control={control} name="languages" label="Languages" options={LANGUAGE_OPTIONS} />
 
           <div className="space-y-2">

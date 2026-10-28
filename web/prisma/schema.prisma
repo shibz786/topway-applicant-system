@@ -72,6 +72,20 @@ enum WorkerCategory {
   CONTRACTED
 }
 
+// C: the 4 workforce modules. Deliberately a different axis from
+// WorkerCategory above (that enum is experience level - first-timer vs.
+// experienced vs. contracted - unrelated to job type, and every existing
+// candidate already uses it correctly; this is new). Every existing
+// candidate defaults to DOMESTIC on migration since that's genuinely what
+// this whole platform has processed until now - not a guess, confirmed by
+// checking the real data before writing the migration.
+enum WorkforceModule {
+  DOMESTIC
+  GENERAL
+  SKILLED
+  PROFESSIONAL
+}
+
 enum Role {
   ADMIN
   STAFF
@@ -175,6 +189,13 @@ model Candidate {
   address          String?
   religion         String?
   category         WorkerCategory
+  // C: which of the 4 workforce modules this candidate belongs to. Default
+  // DOMESTIC covers the whole existing dataset on migration. SKILLED/
+  // PROFESSIONAL candidates don't use the generated-CV fields below the
+  // same way DOMESTIC/GENERAL do - those columns just stay at their
+  // defaults/null for them rather than the schema growing a second,
+  // parallel set of "basic info" columns for no real benefit.
+  workforceModule  WorkforceModule @default(DOMESTIC)
   skills           String[]
   languages        String[]
   yearsExperience  Int            @default(0)
@@ -223,6 +244,7 @@ model Candidate {
   @@index([passportNumber])
   @@index([idNumber])
   @@index([inDatabank])
+  @@index([workforceModule])
 }
 
 // A real gap, not a legacy feature that got dropped: neither the legacy

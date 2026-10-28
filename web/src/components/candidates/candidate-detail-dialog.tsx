@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getCandidate } from "@/lib/actions/candidates";
+import { getCandidate, type CandidateDetail } from "@/lib/actions/candidates";
 import { setPipelineDate } from "@/lib/actions/tracking";
 import { toggleCandidateDatabank } from "@/lib/actions/agent-portal";
 import { WORKER_CATEGORY_LABELS, DEST_COUNTRY_LABELS, DEST_COUNTRY_FLAGS, type PipelineStepKey } from "@/lib/business/tracking";
@@ -128,21 +128,31 @@ export function CandidateDetailDialog({
 
             <div className="space-y-5 px-6 pb-6">
               <div className="flex flex-wrap gap-2 pt-1">
-                <Button size="sm" variant="outline" asChild>
-                  <a href={`/api/candidates/${candidate.id}/pdf`} target="_blank" rel="noreferrer">
-                    View PDF
-                  </a>
-                </Button>
-                <Button size="sm" variant="outline" asChild>
-                  <a href={`/api/candidates/${candidate.id}/pdf?download=1`}>Download PDF</a>
-                </Button>
+                {/* C3/C4: "No generated CV" - the candidate's own uploaded
+                    CV/certificates stand in for the View/Download PDF
+                    buttons that only make sense for DOMESTIC/GENERAL's
+                    templated CV. */}
+                {candidate.workforceModule === "SKILLED" || candidate.workforceModule === "PROFESSIONAL" ? (
+                  <OwnCvButtons candidate={candidate} />
+                ) : (
+                  <>
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={`/api/candidates/${candidate.id}/pdf`} target="_blank" rel="noreferrer">
+                        View PDF
+                      </a>
+                    </Button>
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={`/api/candidates/${candidate.id}/pdf?download=1`}>Download PDF</a>
+                    </Button>
+                    {canEditProfile && (
+                      <CvLogoPicker candidateId={candidate.id} currentMode={candidate.cvLogoMode} onChanged={refresh} />
+                    )}
+                  </>
+                )}
                 {canEditProfile && (
                   <Button size="sm" variant="outline" asChild>
                     <Link href={`/admin/candidates/${candidate.id}/edit`}>Edit Profile</Link>
                   </Button>
-                )}
-                {canEditProfile && (
-                  <CvLogoPicker candidateId={candidate.id} currentMode={candidate.cvLogoMode} onChanged={refresh} />
                 )}
               </div>
 
@@ -326,6 +336,34 @@ export function CandidateDetailDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function OwnCvButtons({ candidate }: { candidate: CandidateDetail }) {
+  const ownCv = candidate.documents.find((d) => d.type === "own_cv");
+  const certCount = candidate.documents.filter((d) => d.type === "certificate").length;
+
+  async function openDoc(documentId: string) {
+    const res = await fetch(`/api/files/${documentId}`);
+    const data = await res.json();
+    if (data.ok) window.open(data.url, "_blank", "noreferrer");
+  }
+
+  return (
+    <>
+      {ownCv ? (
+        <Button size="sm" variant="outline" onClick={() => openDoc(ownCv.id)}>
+          View Candidate&apos;s CV
+        </Button>
+      ) : (
+        <span className="self-center text-xs text-muted-foreground">No CV uploaded yet</span>
+      )}
+      {certCount > 0 && (
+        <span className="self-center text-xs text-muted-foreground">
+          {certCount} certificate{certCount === 1 ? "" : "s"} attached
+        </span>
+      )}
+    </>
   );
 }
 
