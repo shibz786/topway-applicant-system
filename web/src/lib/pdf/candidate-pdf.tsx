@@ -183,7 +183,8 @@ const styles = StyleSheet.create({
   fullphotoImg: { width: "100%", height: "100%", objectFit: "contain" },
   refUnder: { padding: "6 7.5", alignItems: "center", backgroundColor: COLOR.accent },
   refNo: { fontWeight: 600, color: "rgba(255,255,255,0.7)", fontSize: 7.5, letterSpacing: 0.4, textTransform: "uppercase", marginBottom: 1.5 },
-  refName: { fontWeight: 900, color: COLOR.white, letterSpacing: 0.2, fontSize: 10.5 },
+  refNoValue: { fontWeight: 900, color: COLOR.white, letterSpacing: 0.4, fontSize: 11.5 },
+  refName: { fontWeight: 600, color: "rgba(255,255,255,0.85)", letterSpacing: 0.2, fontSize: 8, marginTop: 1.5 },
 
   empBlock: { borderWidth: 0.75, borderColor: COLOR.lineStrong, borderRadius: 2.25, overflow: "hidden" },
   empTitle: {
@@ -252,6 +253,21 @@ export type CandidateForPdf = {
   // placeholder row, since nothing in the old schema ever fed it. Real
   // content now fills that existing slot instead of inventing a new one.
   workHistory: { country: string; role: string | null; years: number }[];
+  // A1 bug fix — these rows always printed blank on the CV (see the file
+  // header comment's "KNOWN GAP"); now backed by real Candidate columns.
+  heightCm: number | null;
+  weightKg: number | null;
+  maritalStatus: string | null;
+  childrenCount: number | null;
+  passportIssueDate: Date | null;
+  passportIssuePlace: string | null;
+  educationGrade: string | null;
+  educationYear: number | null;
+  // A5 bug fix — "REF NO." used to print candidate.fullName. refNo is
+  // nullable at the type level (older rows backfilled it, but the column
+  // itself allows null) — fall back to "-" rather than ever print a name
+  // there again.
+  refNo: string | null;
 };
 
 const SKILL_ROWS = [
@@ -282,11 +298,16 @@ export function CandidatePdfDocument({
         {/* HEADER */}
         <View style={styles.topbar}>
           <View style={styles.logoSlot}>
-            {agentLogoDataUri ? (
+            {/* B2 bug fix: this slot used to print the literal placeholder
+                text "Foreign agency logo" on every real CV with no logo set
+                — left empty instead, so the header still balances (fixed
+                topbar height) without ever showing debug-looking text. Full
+                per-CV choice (logo / company name / empty) is built as its
+                own feature in the Settings work; this is the safe default
+                for every CV that predates that choice existing. */}
+            {agentLogoDataUri && (
               // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image, no alt prop
               <Image src={agentLogoDataUri} style={styles.logoImg} />
-            ) : (
-              <Text style={styles.logoEmpty}>Foreign agency logo</Text>
             )}
           </View>
           <View style={styles.headerCenter}>
@@ -357,30 +378,47 @@ export function CandidatePdfDocument({
           {/* MAIN GRID: Info tables | Full photo */}
           <View style={styles.maingrid}>
             <View style={styles.leftwide}>
-              <InfoRow label="Nationality" value={candidate.nationality} first even={false} />
-              <InfoRow
-                label="Countries Worked In"
-                value={[...new Set(candidate.workHistory.map((w) => w.country))].join(", ")}
-                even
-              />
-              <InfoRow label="Religion" value={candidate.religion ?? ""} even={false} />
-              <InfoRow label="D.O.B" value={fmtDate(candidate.dateOfBirth)} even />
-              <InfoRow label="Age" value={calcAge(candidate.dateOfBirth)} even={false} />
-              <InfoRow label="Height" value="" even />
-              <InfoRow label="Weight" value="" even={false} />
-              <InfoRow label="Marital Status" value="" even />
-              <InfoRow label="Children (No.)" value="" even={false} />
+              {/* Data-driven (not one InfoRow per hardcoded JSX line) so the
+                  "hide Countries Worked In when empty" rule (A1) doesn't
+                  throw off every subsequent row's zebra-stripe parity —
+                  CLAUDE.md's own history flags this exact fragility from an
+                  earlier manual insertion. */}
+              {(
+                [
+                  { label: "Nationality", value: candidate.nationality },
+                  candidate.workHistory.length > 0
+                    ? { label: "Countries Worked In", value: [...new Set(candidate.workHistory.map((w) => w.country))].join(", ") }
+                    : null,
+                  { label: "Religion", value: candidate.religion ?? "" },
+                  { label: "D.O.B", value: fmtDate(candidate.dateOfBirth) },
+                  { label: "Age", value: calcAge(candidate.dateOfBirth) },
+                  { label: "Height", value: candidate.heightCm != null ? `${candidate.heightCm} cm` : "" },
+                  { label: "Weight", value: candidate.weightKg != null ? `${candidate.weightKg} kg` : "" },
+                  { label: "Marital Status", value: candidate.maritalStatus ?? "" },
+                  { label: "Children (No.)", value: candidate.childrenCount != null ? String(candidate.childrenCount) : "" },
+                ] as const
+              )
+                .filter((r): r is { label: string; value: string } => r !== null)
+                .map((r, i) => <InfoRow key={r.label} label={r.label} value={r.value} first={i === 0} even={i % 2 === 1} />)}
 
-              <InfoRow label="Passport No." value={candidate.passportNumber} first even={false} />
-              <InfoRow label="Date of Issue" value="" even />
-              <InfoRow label="Date of Expiry" value={fmtDate(candidate.passportExpiry)} even={false} />
-              <InfoRow label="Place of Issue" value="" even />
+              {(
+                [
+                  { label: "Passport No.", value: candidate.passportNumber },
+                  { label: "Date of Issue", value: fmtDate(candidate.passportIssueDate) },
+                  { label: "Date of Expiry", value: fmtDate(candidate.passportExpiry) },
+                  { label: "Place of Issue", value: candidate.passportIssuePlace ?? "" },
+                ] as const
+              ).map((r, i) => <InfoRow key={r.label} label={r.label} value={r.value} first={i === 0} even={i % 2 === 1} />)}
 
               <View style={styles.sectionRow}>
                 <Text style={styles.sectionRowText}>Educational Qualification</Text>
               </View>
-              <InfoRow label="Grade" value="" first even={false} />
-              <InfoRow label="Year" value="" even />
+              {(
+                [
+                  { label: "Grade", value: candidate.educationGrade ?? "" },
+                  { label: "Year", value: candidate.educationYear != null ? String(candidate.educationYear) : "" },
+                ] as const
+              ).map((r, i) => <InfoRow key={r.label} label={r.label} value={r.value} first={i === 0} even={i % 2 === 1} />)}
             </View>
 
             <View style={styles.rightphoto}>
@@ -394,6 +432,7 @@ export function CandidatePdfDocument({
               </View>
               <View style={styles.refUnder}>
                 <Text style={styles.refNo}>Ref No.</Text>
+                <Text style={styles.refNoValue}>{candidate.refNo ?? "-"}</Text>
                 <Text style={styles.refName}>{candidate.fullName}</Text>
               </View>
             </View>

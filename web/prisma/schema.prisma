@@ -152,6 +152,25 @@ model Candidate {
   yearsExperience  Int            @default(0)
   contractDuration Int // months, typically 24
   inDatabank       Boolean        @default(false)
+  // Client-reported bug (A1): these fields have always printed on the CV
+  // template (candidate-pdf.tsx) as hardcoded blank rows - the legacy port
+  // carried the layout over but nothing in the schema or form ever backed
+  // them, so they could never actually be filled in. All nullable since no
+  // existing candidate has ever had a value for any of them.
+  heightCm             Int?
+  weightKg             Int?
+  maritalStatus        String?
+  childrenCount        Int?
+  passportIssueDate    DateTime?
+  passportIssuePlace   String?
+  educationGrade       String?
+  educationYear        Int?
+  // A real, unique reference number (A1/A5 bug: the CV's "REF NO." block
+  // was printing candidate.fullName instead of an actual reference).
+  // Backed by a Postgres SEQUENCE (refNoSeq below), same pattern as
+  // Invoice.number - a single atomic nextval() is safe under transaction-
+  // mode pooling, no interactive transaction needed. Format "TW-00001".
+  refNo                String?   @unique
   documents        Document[]
   placements       Placement[]
   tracking         Tracking?

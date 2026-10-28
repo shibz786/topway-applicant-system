@@ -17,6 +17,7 @@ import { checkBlacklistMatch, type BlacklistMatch } from "@/lib/actions/blacklis
 import {
   personalDetailsSchema,
   experienceSkillsSchema,
+  MARITAL_STATUS_OPTIONS,
   type PersonalDetailsInput,
   type ExperienceSkillsInput,
   SKILL_OPTIONS,
@@ -117,6 +118,7 @@ function PersonalDetailsStep({
     handleSubmit,
     reset,
     watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<PersonalDetailsInput>({
     resolver: zodResolver(personalDetailsSchema),
@@ -130,6 +132,14 @@ function PersonalDetailsStep({
       phone: "",
       address: "",
       religion: "",
+      heightCm: undefined,
+      weightKg: undefined,
+      maritalStatus: "",
+      childrenCount: undefined,
+      passportIssueDate: "",
+      passportIssuePlace: "",
+      educationGrade: "",
+      educationYear: undefined,
     },
   });
 
@@ -145,6 +155,16 @@ function PersonalDetailsStep({
         phone: existing.phone ?? "",
         address: existing.address ?? "",
         religion: existing.religion ?? "",
+        heightCm: existing.heightCm ?? undefined,
+        weightKg: existing.weightKg ?? undefined,
+        maritalStatus: (existing.maritalStatus as (typeof MARITAL_STATUS_OPTIONS)[number] | null) ?? "",
+        childrenCount: existing.childrenCount ?? undefined,
+        passportIssueDate: existing.passportIssueDate
+          ? new Date(existing.passportIssueDate).toISOString().slice(0, 10)
+          : "",
+        passportIssuePlace: existing.passportIssuePlace ?? "",
+        educationGrade: existing.educationGrade ?? "",
+        educationYear: existing.educationYear ?? undefined,
       });
     }
   }, [existing, reset]);
@@ -212,6 +232,12 @@ function PersonalDetailsStep({
           <Field label="Passport expiry" error={errors.passportExpiry?.message}>
             <Input type="date" {...register("passportExpiry")} />
           </Field>
+          <Field label="Passport date of issue" error={errors.passportIssueDate?.message}>
+            <Input type="date" {...register("passportIssueDate")} />
+          </Field>
+          <Field label="Passport place of issue">
+            <Input {...register("passportIssuePlace")} />
+          </Field>
           <Field label="ID number">
             <Input {...register("idNumber")} />
           </Field>
@@ -220,6 +246,42 @@ function PersonalDetailsStep({
           </Field>
           <Field label="Address" className="sm:col-span-2">
             <Textarea rows={2} {...register("address")} />
+          </Field>
+          <Field label="Height (cm)" error={errors.heightCm?.message}>
+            <Input type="number" {...register("heightCm", { valueAsNumber: true })} />
+          </Field>
+          <Field label="Weight (kg)" error={errors.weightKg?.message}>
+            <Input type="number" {...register("weightKg", { valueAsNumber: true })} />
+          </Field>
+          <div className="space-y-2">
+            <Label>Marital status</Label>
+            <Controller
+              control={control}
+              name="maritalStatus"
+              render={({ field }) => (
+                <Select value={field.value || undefined} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Not specified" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MARITAL_STATUS_OPTIONS.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+          <Field label="Children (No.)" error={errors.childrenCount?.message}>
+            <Input type="number" {...register("childrenCount", { valueAsNumber: true })} />
+          </Field>
+          <Field label="Educational qualification — Grade">
+            <Input {...register("educationGrade")} />
+          </Field>
+          <Field label="Educational qualification — Year" error={errors.educationYear?.message}>
+            <Input type="number" placeholder="e.g. 2015" {...register("educationYear", { valueAsNumber: true })} />
           </Field>
 
           {blacklistMatches.length > 0 && (
@@ -388,9 +450,9 @@ function ExperienceSkillsStep({
           <CheckboxGroup control={control} name="languages" label="Languages" options={LANGUAGE_OPTIONS} />
 
           <div className="space-y-2">
-            <Label>Work experience</Label>
+            <Label>Previous overseas employment</Label>
             <p className="text-xs text-muted-foreground">
-              Prior overseas placements. The country worked in shows on the CV.
+              Country and duration of any prior overseas placements. Shows on the CV; left off entirely if empty.
             </p>
             <div className="space-y-2">
               {workFields.map((field, index) => (

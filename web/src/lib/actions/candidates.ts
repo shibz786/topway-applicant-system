@@ -17,6 +17,33 @@ import { PIPELINE_STEPS } from "@/lib/business/tracking";
 import { runAction, ActionError, type ActionResult } from "./result";
 import type { ApplicationStatus, DestCountry } from "@prisma/client";
 
+// personalDetailsSchema's A1 fields come through as a validated number/
+// string | undefined ("not entered") — this converts that into what
+// Prisma actually wants (null for "not set", a real Date for the
+// issue-date string). One helper shared by every write path so the
+// coercion rule can't drift between create/update.
+function a1FieldsToDbData(data: PersonalDetailsInput) {
+  return {
+    heightCm: data.heightCm ?? null,
+    weightKg: data.weightKg ?? null,
+    maritalStatus: data.maritalStatus || null,
+    childrenCount: data.childrenCount ?? null,
+    passportIssueDate: data.passportIssueDate ? new Date(data.passportIssueDate) : null,
+    passportIssuePlace: data.passportIssuePlace || null,
+    educationGrade: data.educationGrade || null,
+    educationYear: data.educationYear ?? null,
+  };
+}
+
+async function nextRefNo(): Promise<string> {
+  // Same pattern as invoice numbering (see schema.prisma's datasource
+  // comment) — a Postgres SEQUENCE's nextval() is a single atomic
+  // statement, safe under transaction-mode pooling, no interactive
+  // transaction needed.
+  const [{ nextval }] = await db.$queryRaw<{ nextval: bigint }[]>`SELECT nextval('candidate_ref_no_seq')`;
+  return `TW-${String(nextval).padStart(5, "0")}`;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // List (ATS table)
 // ─────────────────────────────────────────────────────────────────
@@ -166,6 +193,7 @@ export async function createCandidateDraft(input: PersonalDetailsInput): Promise
     if (!parsed.success) throw new ActionError(parsed.error.issues[0]?.message ?? "Invalid input");
     const data = parsed.data;
 
+    const refNo = await nextRefNo();
     const candidate = await runAsActor(user, () =>
       db.candidate.create({
         data: {
@@ -178,6 +206,8 @@ export async function createCandidateDraft(input: PersonalDetailsInput): Promise
           phone: data.phone || null,
           address: data.address || null,
           religion: data.religion || null,
+          refNo,
+          ...a1FieldsToDbData(data),
           ...STEP2_DEFAULTS,
         },
       }),
@@ -214,6 +244,7 @@ export async function updateCandidatePersonal(id: string, input: PersonalDetails
           phone: data.phone || null,
           address: data.address || null,
           religion: data.religion || null,
+          ...a1FieldsToDbData(data),
         },
       }),
     );
@@ -288,6 +319,7 @@ export async function updateCandidateFull(id: string, input: CandidateInput): Pr
           phone: data.phone || null,
           address: data.address || null,
           religion: data.religion || null,
+          ...a1FieldsToDbData(data),
           category: data.category,
           skills: data.skills,
           languages: data.languages,

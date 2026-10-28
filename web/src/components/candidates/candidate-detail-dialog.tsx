@@ -207,13 +207,32 @@ export function CandidateDetailDialog({
                 </TabsList>
 
                 <TabsContent value="profile" className="space-y-2 text-sm">
+                  {candidate.refNo && <Field label="Ref No." value={candidate.refNo} />}
                   <Field label="Passport No." value={candidate.passportNumber} />
                   {candidate.idNumber && <Field label="ID No." value={candidate.idNumber} />}
+                  {candidate.passportIssueDate && (
+                    <Field label="Passport Date of Issue" value={new Date(candidate.passportIssueDate).toLocaleDateString()} />
+                  )}
                   <Field label="Passport Expiry" value={new Date(candidate.passportExpiry).toLocaleDateString()} />
+                  {candidate.passportIssuePlace && (
+                    <Field label="Passport Place of Issue" value={candidate.passportIssuePlace} />
+                  )}
                   <Field label="Date of Birth" value={new Date(candidate.dateOfBirth).toLocaleDateString()} />
                   {candidate.religion && <Field label="Religion" value={candidate.religion} />}
                   {candidate.phone && <Field label="Phone" value={candidate.phone} />}
                   {candidate.address && <Field label="Address" value={candidate.address} />}
+                  {candidate.heightCm != null && <Field label="Height" value={`${candidate.heightCm} cm`} />}
+                  {candidate.weightKg != null && <Field label="Weight" value={`${candidate.weightKg} kg`} />}
+                  {candidate.maritalStatus && <Field label="Marital Status" value={candidate.maritalStatus} />}
+                  {candidate.childrenCount != null && (
+                    <Field label="Children (No.)" value={String(candidate.childrenCount)} />
+                  )}
+                  {(candidate.educationGrade || candidate.educationYear != null) && (
+                    <Field
+                      label="Educational Qualification"
+                      value={[candidate.educationGrade, candidate.educationYear].filter(Boolean).join(" · ") || "-"}
+                    />
+                  )}
                   <Field label="Years Experience" value={String(candidate.yearsExperience)} />
                   <Field label="Contract Duration" value={`${candidate.contractDuration} months`} />
                   <Field label="Skills" value={candidate.skills.join(", ") || "-"} />

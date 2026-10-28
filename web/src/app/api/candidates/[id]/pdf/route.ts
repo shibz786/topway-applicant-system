@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PDFDocument } from "pdf-lib";
 import { db } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
 import { assertCanViewCandidate } from "@/lib/auth/candidate-access";
@@ -6,6 +7,33 @@ import { storage } from "@/lib/storage/adapter";
 import { detectMimeFromBytes } from "@/lib/storage/validate-upload";
 import { renderCandidatePdf } from "@/lib/pdf/candidate-pdf";
 import { toErrorResponse } from "@/lib/api-error";
+
+// A4 bug fix: the downloaded CV never included the uploaded passport copy.
+// Appends it as extra pages in the SAME combined PDF — a real PDF passport
+// scan has its pages copied in directly; a JPEG/PNG scan gets embedded as
+// one new full-page image. WEBP/GIF (both accepted uploads per
+// validate-upload.ts) aren't embeddable by pdf-lib; those are skipped with
+// a console warning rather than failing the whole download, matching
+// UAT-09's "no passport copy still downloads fine" extended to "a copy in
+// an unmergeable format still downloads fine too."
+async function appendPassportCopy(cvBytes: Buffer, passportBytes: Buffer, mimeType: string): Promise<Buffer> {
+  const pdf = await PDFDocument.load(cvBytes);
+
+  if (mimeType === "application/pdf") {
+    const passportPdf = await PDFDocument.load(passportBytes);
+    const pages = await pdf.copyPages(passportPdf, passportPdf.getPageIndices());
+    pages.forEach((p) => pdf.addPage(p));
+  } else if (mimeType === "image/jpeg" || mimeType === "image/png") {
+    const image = mimeType === "image/jpeg" ? await pdf.embedJpg(passportBytes) : await pdf.embedPng(passportBytes);
+    const page = pdf.addPage([image.width, image.height]);
+    page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+  } else {
+    console.warn(`Passport copy has unsupported mime type for PDF merge: ${mimeType} — CV downloaded without it.`);
+    return cvBytes;
+  }
+
+  return Buffer.from(await pdf.save());
+}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -15,7 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const candidate = await db.candidate.findUnique({
       where: { id },
       include: {
-        documents: { where: { type: { in: ["headshot", "fullphoto"] } } },
+        documents: { where: { type: { in: ["headshot", "fullphoto", "passport"] } } },
         placements: { where: { isCurrent: true }, include: { agent: true }, take: 1 },
         workHistory: { orderBy: { createdAt: "asc" } },
       },
@@ -44,6 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const headshot = candidate.documents.find((d) => d.type === "headshot");
     const fullphoto = candidate.documents.find((d) => d.type === "fullphoto");
+    const passport = candidate.documents.find((d) => d.type === "passport");
     const agentLogoKey = candidate.placements[0]?.agent.logoR2Key;
 
     const [headshotDataUri, fullPhotoDataUri, agentLogoDataUri] = await Promise.all([
@@ -52,7 +81,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       agentLogoKey ? agentLogoDataUriFor(agentLogoKey).catch(() => null) : Promise.resolve(null),
     ]);
 
-    const pdfBuffer = await renderCandidatePdf({ candidate, headshotDataUri, fullPhotoDataUri, agentLogoDataUri });
+    let pdfBuffer = await renderCandidatePdf({ candidate, headshotDataUri, fullPhotoDataUri, agentLogoDataUri });
+
+    // A4: append the passport copy as extra pages, same combined PDF. A
+    // candidate with no passport copy on file still downloads fine — this
+    // whole block is a no-op when `passport` is undefined.
+    if (passport) {
+      try {
+        const passportBytes = await storage.getObject(passport.r2Key);
+        pdfBuffer = await appendPassportCopy(pdfBuffer, passportBytes, passport.mimeType);
+      } catch (err) {
+        // Never let a passport-merge failure break the whole CV download —
+        // log it and ship the CV without the extra pages instead.
+        console.error(`Failed to merge passport copy for candidate ${id}:`, err);
+      }
+    }
 
     const download = req.nextUrl.searchParams.get("download") === "1";
     return new NextResponse(new Uint8Array(pdfBuffer), {
