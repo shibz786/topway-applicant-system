@@ -112,6 +112,13 @@ model User {
   auditLogs    AuditLog[]
   createdAt    DateTime   @default(now())
   isActive     Boolean    @default(true)
+  // First-time user guidance (onboarding tour): persisted per-user, not
+  // localStorage, so dismissing it on one device actually sticks on
+  // another - same "a real feature gets a real column" precedent as
+  // Notification.seenAt. Column default is false (every NEW user sees the
+  // tour once); the migration backfills every EXISTING row to true so
+  // already-seeded/real accounts don't suddenly get a tour on next login.
+  hasSeenOnboarding Boolean @default(false)
 }
 
 model Session {

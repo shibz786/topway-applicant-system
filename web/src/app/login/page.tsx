@@ -10,6 +10,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+// Demo logins: real seeded accounts, shown openly rather than left for a
+// prospect to guess at. "Try the demo" fills the form (doesn't auto-submit
+// - the person should see what they're about to sign in as, same reason
+// a real login form never auto-submits). The agent demo reuses one of the
+// existing dummy foreign-agency accounts rather than a dedicated throwaway
+// one - it's already real, clean demo data, not a reason to add a 7th
+// agency.
+const DEMO_LOGINS = [
+  { role: "Admin", username: "admin", password: "ChangeMe-Admin-1!", blurb: "Full access: candidates, agents, invoices, staff." },
+  { role: "Staff", username: "staff1", password: "ChangeMe-Staff-1!", blurb: "Permission-gated day-to-day operations." },
+  { role: "Agent", username: "boom", password: "DemoAgent-2026!", blurb: "Cedar Link Overseas — the mobile-first Agent Portal." },
+] as const;
+
 export default function LoginPage() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -17,11 +30,17 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { username: "", password: "" },
   });
+
+  function fillDemo(username: string, password: string) {
+    setValue("username", username);
+    setValue("password", password);
+  }
 
   async function onSubmit(values: LoginInput) {
     setServerError(null);
@@ -118,9 +137,34 @@ export default function LoginPage() {
               {isSubmitting ? "Signing in…" : "Sign In"}
             </Button>
           </form>
+
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+            <p className="text-xs font-medium">Just want to look around?</p>
+            <p className="text-xs text-muted-foreground">
+              These are real, live demo accounts — pick one to fill the form above.
+            </p>
+            <div className="space-y-1.5 pt-1">
+              {DEMO_LOGINS.map((d) => (
+                <button
+                  key={d.username}
+                  type="button"
+                  onClick={() => fillDemo(d.username, d.password)}
+                  className="flex w-full items-start justify-between gap-2 rounded-md border bg-background px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-muted"
+                >
+                  <span>
+                    <span className="font-medium">{d.role}</span>
+                    <span className="block text-muted-foreground">{d.blurb}</span>
+                  </span>
+                  <span className="shrink-0 self-center font-mono text-[10px] text-muted-foreground">
+                    {d.username}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">Topway Private Limited, internal use only</p>
+        <p className="text-xs text-muted-foreground">Topway Private Limited — Recruitment Operations Platform</p>
       </div>
     </div>
   );
