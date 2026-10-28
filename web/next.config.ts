@@ -17,6 +17,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Next's own dev-mode route indicator (a floating badge, bottom-left by
+  // default) sat directly on top of the Switchboard sidebar's user/sign-out
+  // block once that sidebar existed - dev-only chrome, never shipped to
+  // Vercel, but a real visible collision locally. Off entirely rather than
+  // repositioned around, since it has no function here.
+  devIndicators: false,
   async headers() {
     return [
       {

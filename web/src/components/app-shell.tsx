@@ -56,40 +56,30 @@ function navItemsFor(user: SessionUser): NavItem[] {
 
 const ROLE_LABEL: Record<string, string> = { ADMIN: "Admin", STAFF: "Staff", AGENT: "Agent" };
 
-// "The Manifest" shell. The masthead is real glass, not a flat panel —
-// semi-transparent brand ink with backdrop-blur, so content scrolling
-// underneath it is genuinely visible through the bar. This is one of the
-// two places this redesign uses glassmorphism (see the mockup artifact's
-// own reasoning): a sticky header has something to blur by construction,
-// unlike a dense table or KPI tile where blur would fight legibility. The
-// folder-tab row underneath (active tab fuses with the page's own paper
-// background) is unchanged in concept from "The Register" — that idea
-// wasn't the part the user rejected, the typography and palette were.
+// "Switchboard", the direction picked from the mockup comparison
+// (see the redesign-directions artifact). A persistent left rail
+// replaces the old top folder-tab bar: it carries the mark on every
+// screen instead of a thin strip, and has room to grow as more modules
+// land, which the tab row never did. Collapses to a slim top bar with
+// a horizontally-scrolling nav row below sm, so the agent portal's
+// zero-horizontal-overflow-at-375px behavior is unchanged, not a
+// regression: the sidebar only exists at sm and up.
 export function AppShell({ user, children }: { user: SessionUser; children: React.ReactNode }) {
   const pathname = usePathname();
   const navItems = navItemsFor(user);
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b border-white/8 bg-brand-ink/80 supports-backdrop-filter:backdrop-blur-md supports-backdrop-filter:backdrop-saturate-150">
-        <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
+    <div className="flex min-h-screen flex-col sm:flex-row">
+      {/* Mobile top bar, sm and up use the sidebar instead. */}
+      <header className="sticky top-0 z-10 border-b border-white/8 bg-brand-ink sm:hidden">
+        <div className="flex h-14 items-center justify-between gap-3 px-4">
           <Link href="/dashboard" className="flex shrink-0 items-center gap-2.5">
             <Image src="/mark.png" alt="" width={20} height={19} priority className="brightness-0 invert" />
-            <span className="hidden text-[16px] font-semibold tracking-tight text-white sm:inline">
-              Topway
-            </span>
+            <span className="text-[16px] font-semibold tracking-tight text-white">Topway</span>
           </Link>
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right leading-tight sm:block">
-              <p className="text-sm font-medium text-white">{user.name}</p>
-              <p className="font-mono text-[10.5px] tracking-wide text-white/60 uppercase">
-                {ROLE_LABEL[user.role] ?? user.role}
-              </p>
-            </div>
-            <LogoutButton />
-          </div>
+          <LogoutButton />
         </div>
-        <nav className="flex items-end gap-0.5 overflow-x-auto px-3 sm:px-5">
+        <nav className="flex items-center gap-1 overflow-x-auto px-3 pb-2">
           {navItems.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
@@ -97,8 +87,8 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "shrink-0 rounded-t-md px-4 py-2 font-mono text-[11.5px] font-medium tracking-wide whitespace-nowrap transition-colors",
-                  active ? "bg-background font-semibold text-brand-ink" : "text-white/60 hover:bg-white/10 hover:text-white",
+                  "shrink-0 rounded-md px-3 py-1.5 font-mono text-[11px] font-medium tracking-wide whitespace-nowrap transition-colors",
+                  active ? "bg-white/15 text-white" : "text-white/60 hover:bg-white/10 hover:text-white",
                 )}
               >
                 {item.label}
@@ -107,7 +97,42 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
           })}
         </nav>
       </header>
-      <main className="flex-1">{children}</main>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden w-56 shrink-0 flex-col bg-gradient-to-b from-brand-ink to-[#0b1215] sm:flex">
+        <Link href="/dashboard" className="flex items-center gap-2.5 px-5 py-5">
+          <Image src="/mark.png" alt="" width={22} height={21} priority className="brightness-0 invert" />
+          <span className="text-[16px] font-semibold tracking-tight text-white">Topway</span>
+        </Link>
+        <nav className="flex flex-1 flex-col gap-0.5 px-3">
+          {navItems.map((item) => {
+            const active = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "rounded-md px-3 py-2 font-mono text-[12.5px] font-medium tracking-wide transition-colors",
+                  active ? "bg-white/15 font-semibold text-white" : "text-white/55 hover:bg-white/8 hover:text-white",
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="border-t border-white/10 px-5 py-4">
+          <p className="truncate text-sm font-medium text-white">{user.name}</p>
+          <p className="font-mono text-[10.5px] tracking-wide text-white/50 uppercase">
+            {ROLE_LABEL[user.role] ?? user.role}
+          </p>
+          <div className="mt-2.5">
+            <LogoutButton />
+          </div>
+        </div>
+      </aside>
+
+      <main className="min-w-0 flex-1">{children}</main>
     </div>
   );
 }

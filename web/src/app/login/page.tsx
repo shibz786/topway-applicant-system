@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 const DEMO_LOGINS = [
   { role: "Admin", username: "admin", password: "ChangeMe-Admin-1!", blurb: "Full access: candidates, agents, invoices, staff." },
   { role: "Staff", username: "staff1", password: "ChangeMe-Staff-1!", blurb: "Permission-gated day-to-day operations." },
-  { role: "Agent", username: "boom", password: "DemoAgent-2026!", blurb: "Cedar Link Overseas — the mobile-first Agent Portal." },
+  { role: "Agent", username: "boom", password: "DemoAgent-2026!", blurb: "Cedar Link Overseas, the mobile-first Agent Portal." },
 ] as const;
 
 export default function LoginPage() {
@@ -62,7 +62,7 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-      {/* Brand panel — the mark's own gradient, its pillar form echoed
+      {/* Brand panel, the mark's own gradient, its pillar form echoed
           faintly in the background. Hidden below lg: the form is what
           matters on a phone, not the scenery. */}
       <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#1c4a56] via-[#20525f] to-[#2b6f80] p-12 lg:flex lg:flex-col lg:justify-between">
@@ -141,7 +141,7 @@ export default function LoginPage() {
           <div className="space-y-2 rounded-md border bg-muted/30 p-3">
             <p className="text-xs font-medium">Just want to look around?</p>
             <p className="text-xs text-muted-foreground">
-              These are real, live demo accounts — pick one to fill the form above.
+              These are real, live demo accounts. Pick one to fill the form above.
             </p>
             <div className="space-y-1.5 pt-1">
               {DEMO_LOGINS.map((d) => (
@@ -164,7 +164,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">Topway Private Limited — Recruitment Operations Platform</p>
+        <p className="text-xs text-muted-foreground">Topway Private Limited, Recruitment Operations Platform</p>
       </div>
     </div>
   );

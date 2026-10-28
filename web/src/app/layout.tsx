@@ -47,10 +47,26 @@ export default async function RootLayout({
     // suppressHydrationWarning: next-themes sets the .dark class via that
     // pre-paint script, which never matches the server-rendered markup —
     // expected and harmless, this is next-themes' own documented fix.
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${inter.variable} ${plexMono.variable} antialiased`}
-      >
+    //
+    // The font variable classes (inter.variable/plexMono.variable) live on
+    // <html>, not <body>. A real bug, found live: they used to sit on
+    // <body> only. CSS custom properties resolve lazily per-element using
+    // that element's OWN inheritance chain, not a value frozen at the
+    // declaring selector - so globals.css's `html { font-family:
+    // var(--font-inter) }` rule, evaluated AT html itself, saw an unset
+    // --font-inter (the class granting it was one level further down, on
+    // body) and fell through to the CSS initial value with no fallback,
+    // which Chromium renders as Times. Every element that inherited
+    // font-family through html/body rather than carrying its own explicit
+    // font-heading/font-mono class (i.e. nearly all plain body text)
+    // rendered in serif Times instead of Inter. Headings looked fine only
+    // because .font-heading directly re-resolves --font-inter at its own
+    // position. Putting the variable classes on <html> fixes it at the
+    // root, for every descendant, without needing an explicit class
+    // anywhere - confirmed live via computed-style inspection (html/body
+    // font-family both read "Inter, Inter Fallback" after the fix).
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${plexMono.variable}`}>
+      <body className="antialiased">
         <Providers nonce={nonce}>{children}</Providers>
         <Toaster />
       </body>

@@ -26,8 +26,8 @@ export function OpsDashboard({ name }: { name: string }) {
     return (
       <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-8">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 7 }).map((_, i) => (
             <Skeleton key={i} className="h-24" />
           ))}
         </div>
@@ -105,6 +105,7 @@ function buttonish(kind: "outline" | "solid") {
 function Kpis({ data }: { data: OpsDashboardData }) {
   const items: { label: string; value: string; sub?: string; tone?: "critical" }[] = [
     { label: "Active candidates", value: String(data.kpis.activeCandidates) },
+    { label: "On hold", value: String(data.kpis.onHoldCandidates) },
     {
       label: "Open disputes",
       value: String(data.kpis.openDisputes),
@@ -116,21 +117,31 @@ function Kpis({ data }: { data: OpsDashboardData }) {
     items.push({
       label: "Outstanding",
       value: `${data.kpis.currency} ${data.kpis.outstandingTotal.toLocaleString()}`,
-      sub: data.kpis.paidTotal ? `${data.kpis.currency} ${data.kpis.paidTotal.toLocaleString()} paid` : undefined,
+      sub: "Sent, not yet paid",
+    });
+  }
+  if (data.canManageInvoices && data.kpis.paidTotal !== null) {
+    items.push({
+      label: "Revenue (paid)",
+      value: `${data.kpis.currency} ${data.kpis.paidTotal.toLocaleString()}`,
+      sub: "All time",
     });
   }
   if (data.canManageAgents && data.kpis.agentsCount !== null) {
-    items.push({ label: "Agents", value: String(data.kpis.agentsCount) });
+    items.push({ label: "Agencies", value: String(data.kpis.agentsCount) });
   }
 
   return (
-    <div className="grid grid-cols-2 divide-x divide-border overflow-hidden rounded-lg border bg-card sm:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {items.map((item) => (
-        <div key={item.label} className="p-3.5 transition-colors hover:bg-accent/30">
+        <div
+          key={item.label}
+          className="rounded-lg border bg-card p-3.5 transition-colors hover:border-primary/40 hover:bg-accent/20"
+        >
           <p className="text-[10.5px] font-medium tracking-wide text-muted-foreground uppercase">{item.label}</p>
           <p
             className={cn(
-              "mt-1.5 font-heading text-xl font-semibold tabular-nums",
+              "mt-1.5 font-mono text-xl font-semibold tabular-nums",
               item.tone === "critical" && "text-critical",
             )}
           >
